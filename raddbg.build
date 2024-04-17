@@ -1,0 +1,124 @@
+# --- Usage Notes (2024/1/10) ------------------------------------------------
+#
+# This is a central build script for the RAD Debugger project. It takes a list
+# of simple alphanumeric-only arguments which control 
+#    (a) what is built
+#    (b) which compiler & linker are used
+#    (c) extra high-level build options. By default, if no options are passed, then the main "raddbg" graphical debugger is built.
+#
+# Below is a non-exhaustive list of possible ways to use the script:
+# `riftbuild`
+# `riftbuild cl`
+# `riftbuild release`
+# `riftbuild asan telemetry`
+# `riftbuild raddbg_from_pdb`
+#
+# For a full list of possible build targets and their build command lines,
+# search for @build_targets in this file.
+#
+# Below is a list of all possible non-target command line options:
+#
+# - `asan`     : enable address sanitizer
+# - `telemetry`: enable RAD telemetry profiling support
+# ---------------------------------------------------------------------------
+
+if release Assembly raddbg else Assembly raddbg-debug
+if cl      Compiler cl     else Compiler clang
+
+if !no_meta Depends metagen src/metagen | $compiler
+
+SourceDirectory src
+BuildDirectory build
+IntermediateDirectory int
+
+IncludedSourceFiles raddbg.cpp
+
+Icon raddbg.ico
+
+AsanCompilerFlags
+TelemetryDefines
+if asan      AsanCompilerFlags -fsanitize=address
+if telemetry TelemetryDefines PROFILE_TELEMETRY=1
+
+if debug             "[debug mode]"
+if release           "[release mode]"
+if compiler == clang "[clang compile]"
+if compiler == cl    "[msvc compile]"
+if asan              "[asan enabled]"
+if telemetry         "[telemetry enabled]"
+if no_meta           "[skipping metagen]"
+
+WarningFlags_Clang [
+    -Wall
+    -Wno-missing-braces
+    -Wno-unused-function
+    -Wno-writable-strings
+    -Wno-unused-value
+    -Wno-unused-variable
+    -Wno-unused-local-typedef
+    -Wno-deprecated-register
+    -Wno-deprecated-declarations
+    -Wno-unused-but-set-variable
+    -Wno-single-bit-bitfield-constant-conversion
+]
+
+CommonFlags_Clang [
+    $WarningFlags_Clang
+    -maes -msse3 -msse4
+    -gcodeview
+    -fdiagnostics-absolute-paths
+    -Xclang
+    -flto-visibility-public-std
+]
+
+CommonFlags_MSVC /nologo /FC /Z7 /MP
+
+CommonDefines_Clang [
+    _USE_MATH_DEFINES
+    strdup=_strdup
+    gnu_printf=printf
+    $TelemetryDefines
+]
+
+CommonDefines_MSVC $TelemetryDefines
+
+DebugFlags_Clang   $CommonFlags_Clang -g -O0
+ReleaseFlags_Clang $CommonFlags_Clang -g -O3
+
+DebugFlags_MSVC    $CommonFlags_MSVC /Od
+ReleaseFlags_MSVC  $CommonFlags_MSVC /O2
+
+DebugDefines     _DEBUG
+ReleaseDefines   NDEBUG
+
+if compiler == clang {
+    ReleaseFlags     $ReleaseFlags_Clang
+    DebugFlags       $DebugFlags_Clang
+    LinkerFlags      -Xlinker /natvis:"src\natvis\base.natvis"
+    Defines          $CommonDefines_Clang
+} else {
+    ReleaseFlags     $ReleaseFlags_MSVC
+    DebugFlags       $DebugFlags_MSVC
+    LinkerFlags      /natvis:"src\natvis\base.natvis"
+    Defines          $CommonDefines_MSVC
+}
+
+Includes src local
+Defines OS_FEATURE_GRAPHICAL=1
+
+if net Defines OS_FEATURE_SOCKET=1
+
+if release {
+    CompilerFlags $ReleaseFlags
+    Defines       $ReleaseDefines
+} else {
+    CompilerFlags $DebugFlags
+    Defines       $DebugDefines
+}
+
+PreBuildCmd if not exist build mkdir build
+PreBuildCmd if not exist local mkdir local
+
+#PreBuild.NewDirectory local
+
+RunAssembly
