@@ -84,11 +84,10 @@ usage: cl [ option... ] filename... [ /link linkoption... ]
 
 ### 3. Building
 
-Within this terminal, `cd` to the root directory of the codebase, and just run
-the `build.bat` script:
+Within any terminal, `cd` to the root directory of the codebase, and just run
 
 ```
-build
+riftbuild
 ```
 
 You should see the following output:
