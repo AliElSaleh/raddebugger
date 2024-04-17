@@ -1,0 +1,70 @@
+Assembly %_filename
+
+if cl Compiler cl else Compiler clang
+
+BuildDirectory ../../build
+IntermediateDirectory ../../int/%_filename
+
+IncludedSourceFiles metagen_main.c
+
+LinkerFlags_Clang -Xlinker /natvis:"..\src\natvis\base.natvis"
+LinkerFlags_MSVC  /natvis:"..\src\natvis\base.natvis"
+
+WarningFlags_Clang [
+    -Wall
+    -Wno-missing-braces
+    -Wno-unused-function
+    -Wno-writable-strings
+    -Wno-unused-value
+    -Wno-unused-variable
+    -Wno-unused-local-typedef
+    -Wno-deprecated-register
+    -Wno-deprecated-declarations
+    -Wno-unused-but-set-variable
+    -Wno-single-bit-bitfield-constant-conversion
+]
+
+CommonFlags_Clang [
+    $WarningFlags_Clang
+    -maes
+    -mssse3
+    -msse4
+    -gcodeview
+    -fdiagnostics-absolute-paths
+    -Xclang
+    -flto-visibility-public-std
+]
+
+CommonFlags_MSVC /FC /Z7 /MP
+
+CommonDefines_Clang [
+    _USE_MATH_DEFINES
+    strdup=_strdup
+    gnu_printf=printf
+]
+
+DebugFlags_Clang [
+    $CommonFlags_Clang
+    -g
+    -O0
+]
+
+DebugFlags_MSVC [
+    $CommonFlags_MSVC
+    /Od
+]
+
+Defines _DEBUG
+
+if compiler == clang {
+    CompilerFlags    $DebugFlags_Clang
+    LinkerFlags      $LinkerFlags_Clang
+    Defines          $CommonDefines_Clang
+} else {
+    CompilerFlags    $DebugFlags_MSVC
+    LinkerFlags      $LinkerFlags_MSVC
+}
+
+Includes ../../src ../../local
+
+RunAssembly
