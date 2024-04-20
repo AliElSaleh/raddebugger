@@ -106,6 +106,7 @@ raddbg.cpp
 
 If everything worked correctly, there will be a `build` folder in the root
 level of the codebase, and it will contain a freshly-built `raddbg.exe`.
+You should also see the debugger open up automatically.
 
 ## Short-To-Medium-Term Roadmap
 
