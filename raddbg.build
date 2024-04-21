@@ -31,7 +31,7 @@ SourceDirectory src
 BuildDirectory build
 IntermediateDirectory int
 
-IncludedSourceFiles raddbg.cpp
+IncludedSourceFiles raddbg_main.cpp
 
 Icon raddbg.ico
 
@@ -40,6 +40,7 @@ TelemetryDefines
 if asan      AsanCompilerFlags -fsanitize=address
 if telemetry TelemetryDefines PROFILE_TELEMETRY=1
 
+# status logging
 if debug             "[debug mode]"
 if release           "[release mode]"
 if compiler == clang "[clang compile]"
@@ -71,8 +72,6 @@ CommonFlags_Clang [
     -flto-visibility-public-std
 ]
 
-CommonFlags_MSVC /nologo /FC /Z7 /MP
-
 CommonDefines_Clang [
     _USE_MATH_DEFINES
     strdup=_strdup
@@ -80,6 +79,7 @@ CommonDefines_Clang [
     $TelemetryDefines
 ]
 
+CommonFlags_MSVC /nologo /FC /Z7 /MP
 CommonDefines_MSVC $TelemetryDefines
 
 DebugFlags_Clang   $CommonFlags_Clang -g -O0
@@ -115,9 +115,6 @@ if release {
     CompilerFlags $DebugFlags
     Defines       $DebugDefines
 }
-
-PreBuildCmd if not exist build mkdir build
-PreBuildCmd if not exist local mkdir local
 
 #PreBuild.NewDirectory local
 
