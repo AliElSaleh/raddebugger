@@ -1,39 +1,59 @@
-# --- Usage Notes (2024/1/10) ------------------------------------------------
-#
-# This is a central build script for the RAD Debugger project. It takes a list
-# of simple alphanumeric-only arguments which control 
-#    (a) what is built
-#    (b) which compiler & linker are used
-#    (c) extra high-level build options. By default, if no options are passed, then the main "raddbg" graphical debugger is built.
-#
-# Below is a non-exhaustive list of possible ways to use the script:
-# `riftbuild`
-# `riftbuild cl`
-# `riftbuild release`
-# `riftbuild asan telemetry`
-# `riftbuild raddbg_from_pdb`
-#
-# For a full list of possible build targets and their build command lines,
-# search for @build_targets in this file.
-#
-# Below is a list of all possible non-target command line options:
-#
-# - `asan`     : enable address sanitizer
-# - `telemetry`: enable RAD telemetry profiling support
-# ---------------------------------------------------------------------------
+## --- Usage Notes (2024/1/10) ------------------------------------------------
+
+ This is a central build script for the RAD Debugger project. It takes a list
+ of simple alphanumeric-only arguments which control 
+    (a) what is built
+    (b) which compiler & linker are used
+    (c) extra high-level build options. By default, if no options are passed, then the main "raddbg" graphical debugger is built.
+
+ Below is a non-exhaustive list of possible ways to use the script:
+ - riftbuild
+ - riftbuild cl
+ - riftbuild release
+ - riftbuild asan telemetry
+ - riftbuild raddbg_from_pdb
+
+ Below is a list of all possible non-target command line options:
+
+ - asan      : enable address sanitizer
+ - telemetry : enable RAD telemetry profiling support
+
+## ---------------------------------------------------------------------------
 
 if release Assembly raddbg else Assembly raddbg-debug
 if cl      Compiler cl     else Compiler clang
 
 if !no_meta Depends metagen src/metagen | $compiler
 
-SourceDirectory src
-BuildDirectory build
+SourceDirectory       src
+BuildDirectory        build
 IntermediateDirectory int
 
-IncludedSourceFiles raddbg_main.cpp
+FilesToUse raddbg_main.c
 
-Icon raddbg.ico
+if raddbg_from_pdb           FilesToUse` raddbgi_from_pdb_main.c
+if raddbg_from_dwarf         FilesToUse` raddbgi_from_dwarf.c
+if raddbgi_dump              FilesToUse` raddbgi_dump_main.c
+if raddbgi_breakpad_from_pdb FilesToUse` raddbgi_breakpad_from_pdb_main.c
+if ryan_scratch              FilesToUse` ryan_scratch.c
+if cpp_tests                 FilesToUse` i_hate_c_plus_plus.cpp
+if look_at_raddgb            FilesToUse` look_at_raddbg.c
+if mule_main                 FilesToUse` mule_main.cpp mule_inline.cpp
+if mule_module               FilesToUse` mule_module.cpp
+
+IncludedSourceFiles $FilesToUse
+
+Includes src local
+
+Defines [
+    OS_FEATURE_GRAPHICAL=%!raddbg_from_pdb
+    OS_FEATURE_SOCKET=%net
+    BUILD_GIT_HASH=\"!(git describe --always --dirty)\"
+]
+
+Icon logo.ico
+
+#PreBuild.NewDirectory local
 
 AsanCompilerFlags
 TelemetryDefines
@@ -61,6 +81,7 @@ WarningFlags_Clang [
     -Wno-deprecated-declarations
     -Wno-unused-but-set-variable
     -Wno-single-bit-bitfield-constant-conversion
+    -Wno-compare-distinct-pointer-types
 ]
 
 CommonFlags_Clang [
@@ -79,7 +100,7 @@ CommonDefines_Clang [
     $TelemetryDefines
 ]
 
-CommonFlags_MSVC /nologo /FC /Z7 /MP
+CommonFlags_MSVC   /nologo /FC /Z7 /MP
 CommonDefines_MSVC $TelemetryDefines
 
 DebugFlags_Clang   $CommonFlags_Clang -g -O0
@@ -88,8 +109,8 @@ ReleaseFlags_Clang $CommonFlags_Clang -g -O3
 DebugFlags_MSVC    $CommonFlags_MSVC /Od
 ReleaseFlags_MSVC  $CommonFlags_MSVC /O2
 
-DebugDefines     _DEBUG
-ReleaseDefines   NDEBUG
+DebugDefines       _DEBUG
+ReleaseDefines     NDEBUG
 
 if compiler == clang {
     ReleaseFlags     $ReleaseFlags_Clang
@@ -103,11 +124,6 @@ if compiler == clang {
     Defines          $CommonDefines_MSVC
 }
 
-Includes src local
-Defines OS_FEATURE_GRAPHICAL=1
-
-if net Defines OS_FEATURE_SOCKET=1
-
 if release {
     CompilerFlags $ReleaseFlags
     Defines       $ReleaseDefines
@@ -115,7 +131,5 @@ if release {
     CompilerFlags $DebugFlags
     Defines       $DebugDefines
 }
-
-#PreBuild.NewDirectory local
 
 RunAssembly
