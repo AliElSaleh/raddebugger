@@ -11,7 +11,7 @@
  - riftbuild cl
  - riftbuild release
  - riftbuild asan telemetry
- - riftbuild raddbg_from_pdb
+ - riftbuild rdi_from_pdb
 
  Below is a list of all possible non-target command line options:
 
@@ -20,7 +20,9 @@
 
 ## ---------------------------------------------------------------------------
 
-if release Assembly raddbg else Assembly raddbg-debug
+FinalName raddbg
+
+if release Assembly $(FinalName) else Assembly $(FinalName)-debug
 if cl      Compiler cl     else Compiler clang
 
 if !no_meta Depends metagen src/metagen | $compiler
@@ -31,22 +33,22 @@ IntermediateDirectory int
 
 FilesToUse raddbg_main.c
 
-if raddbg_from_pdb           FilesToUse` raddbgi_from_pdb_main.c
-if raddbg_from_dwarf         FilesToUse` raddbgi_from_dwarf.c
-if raddbgi_dump              FilesToUse` raddbgi_dump_main.c
-if raddbgi_breakpad_from_pdb FilesToUse` raddbgi_breakpad_from_pdb_main.c
-if ryan_scratch              FilesToUse` ryan_scratch.c
-if cpp_tests                 FilesToUse` i_hate_c_plus_plus.cpp
-if look_at_raddgb            FilesToUse` look_at_raddbg.c
-if mule_main                 FilesToUse` mule_main.cpp mule_inline.cpp
-if mule_module               FilesToUse` mule_module.cpp
+if rdi_from_pdb              FinalName` rdi_from_pdb          ; FilesToUse` rdi_from_pdb_main.c
+if rdi_from_dwarf            FinalName` rdi_from_dwarf        ; FilesToUse` rdi_from_dwarf.c
+if rdi_dump                  FinalName` rdi_dump              ; FilesToUse` rdi_dump_main.c
+if rdi_breakpad_from_pdb     FinalName` rdi_breakpad_from_pdb ; FilesToUse` rdi_breakpad_from_pdb_main.c
+if ryan_scratch              FinalName` ryan_scratch          ; FilesToUse` ryan_scratch.c
+if cpp_tests                 FinalName` cpp_tests             ; FilesToUse` i_hate_c_plus_plus.cpp
+if look_at_raddgb            FinalName` look_at_raddgb        ; FilesToUse` look_at_raddbg.c
+if mule_main                 FinalName` mule_main             ; FilesToUse` mule_main.cpp mule_inline.cpp
+if mule_module               FinalName` mule_module           ; FilesToUse` mule_module.cpp
 
 IncludedSourceFiles $FilesToUse
 
 Includes src local
 
 Defines [
-    OS_FEATURE_GRAPHICAL=%!raddbg_from_pdb
+    OS_FEATURE_GRAPHICAL=%!rdi_from_pdb
     OS_FEATURE_SOCKET=%net
     BUILD_GIT_HASH=\"!(git describe --always --dirty)\"
 ]
@@ -61,13 +63,16 @@ if asan      AsanCompilerFlags -fsanitize=address
 if telemetry TelemetryDefines PROFILE_TELEMETRY=1
 
 # status logging
-if debug             "[debug mode]"
-if release           "[release mode]"
-if compiler == clang "[clang compile]"
-if compiler == cl    "[msvc compile]"
-if asan              "[asan enabled]"
-if telemetry         "[telemetry enabled]"
-if no_meta           "[skipping metagen]"
+if FilesToUse == raddbg_main.c "[default mode, assuming `raddbg` build]"
+if FilesToUse == raddbg_main.c RunAssembly
+
+if debug                       "[debug mode]"
+if release                     "[release mode]"
+if compiler == clang           "[clang compile]"
+if compiler == cl              "[msvc compile]"
+if asan                        "[asan enabled]"
+if telemetry                   "[telemetry enabled]"
+if no_meta                     "[skipping metagen]"
 
 WarningFlags_Clang [
     -Wall
@@ -132,4 +137,3 @@ if release {
     Defines       $DebugDefines
 }
 
-RunAssembly
