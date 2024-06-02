@@ -57,68 +57,107 @@ typedef enum UI_FocusKind
 UI_FocusKind;
 
 ////////////////////////////////
-//~ rjf: Navigation Types
+//~ rjf: Events
 
-typedef enum UI_NavDeltaUnit
+// TODO(rjf): clean all this up
+
+typedef enum UI_EventKind
 {
-  UI_NavDeltaUnit_Element,
-  UI_NavDeltaUnit_Chunk,
-  UI_NavDeltaUnit_Whole,
-  UI_NavDeltaUnit_EndPoint,
-  UI_NavDeltaUnit_COUNT,
+  UI_EventKind_Null,
+  UI_EventKind_Press,
+  UI_EventKind_Release,
+  UI_EventKind_Text,
+  UI_EventKind_Navigate,
+  UI_EventKind_Edit,
+  UI_EventKind_MouseMove,
+  UI_EventKind_Scroll,
+  UI_EventKind_AutocompleteHint,
+  UI_EventKind_COUNT
 }
-UI_NavDeltaUnit;
+UI_EventKind;
 
-typedef U32 UI_NavActionFlags;
+typedef enum UI_EventActionSlot
+{
+  UI_EventActionSlot_Null,
+  UI_EventActionSlot_Accept,
+  UI_EventActionSlot_Cancel,
+  UI_EventActionSlot_Edit,
+  UI_EventActionSlot_COUNT
+}
+UI_EventActionSlot;
+
+typedef U32 UI_EventFlags;
 enum
 {
-  UI_NavActionFlag_KeepMark            = (1<<0),
-  UI_NavActionFlag_Delete              = (1<<1),
-  UI_NavActionFlag_Copy                = (1<<2),
-  UI_NavActionFlag_Paste               = (1<<3),
-  UI_NavActionFlag_ZeroDeltaOnSelect   = (1<<4),
-  UI_NavActionFlag_PickSelectSide      = (1<<5),
-  UI_NavActionFlag_CapAtLine           = (1<<6),
-  UI_NavActionFlag_ExplicitDirectional = (1<<7),
-  UI_NavActionFlag_ReplaceAndCommit    = (1<<8),
+  UI_EventFlag_KeepMark            = (1<<0),
+  UI_EventFlag_Delete              = (1<<1),
+  UI_EventFlag_Copy                = (1<<2),
+  UI_EventFlag_Paste               = (1<<3),
+  UI_EventFlag_ZeroDeltaOnSelect   = (1<<4),
+  UI_EventFlag_PickSelectSide      = (1<<5),
+  UI_EventFlag_CapAtLine           = (1<<6),
+  UI_EventFlag_ExplicitDirectional = (1<<7),
+  UI_EventFlag_Reorder             = (1<<8),
 };
 
-typedef struct UI_NavAction UI_NavAction;
-struct UI_NavAction
+typedef enum UI_EventDeltaUnit
 {
-  UI_NavActionFlags flags;
-  Vec2S32 delta;
-  UI_NavDeltaUnit delta_unit;
-  String8 insertion;
+  UI_EventDeltaUnit_Null,
+  UI_EventDeltaUnit_Char,
+  UI_EventDeltaUnit_Word,
+  UI_EventDeltaUnit_Line,
+  UI_EventDeltaUnit_Page,
+  UI_EventDeltaUnit_Whole,
+  UI_EventDeltaUnit_COUNT
+}
+UI_EventDeltaUnit;
+
+typedef struct UI_Event UI_Event;
+struct UI_Event
+{
+  UI_EventKind kind;
+  UI_EventActionSlot slot;
+  UI_EventFlags flags;
+  UI_EventDeltaUnit delta_unit;
+  OS_Key key;
+  OS_EventFlags modifiers;
+  String8 string;
+  Vec2F32 pos;
+  Vec2F32 delta_2f32;
+  Vec2S32 delta_2s32;
+  U64 timestamp_us;
 };
 
-typedef struct UI_NavActionNode UI_NavActionNode;
-struct UI_NavActionNode
+typedef struct UI_EventNode UI_EventNode;
+struct UI_EventNode
 {
-  UI_NavActionNode *next;
-  UI_NavActionNode *prev;
-  UI_NavAction v;
+  UI_EventNode *next;
+  UI_EventNode *prev;
+  UI_Event v;
 };
 
-typedef struct UI_NavActionList UI_NavActionList;
-struct UI_NavActionList
+typedef struct UI_EventList UI_EventList;
+struct UI_EventList
 {
-  UI_NavActionNode *first;
-  UI_NavActionNode *last;
+  UI_EventNode *first;
+  UI_EventNode *last;
   U64 count;
 };
 
-typedef U32 UI_NavTxtOpFlags;
+////////////////////////////////
+//~ rjf: Textual Operations
+
+typedef U32 UI_TxtOpFlags;
 enum
 {
-  UI_NavTxtOpFlag_Invalid = (1<<0),
-  UI_NavTxtOpFlag_Copy    = (1<<1),
+  UI_TxtOpFlag_Invalid = (1<<0),
+  UI_TxtOpFlag_Copy    = (1<<1),
 };
 
-typedef struct UI_NavTxtOp UI_NavTxtOp;
-struct UI_NavTxtOp
+typedef struct UI_TxtOp UI_TxtOp;
+struct UI_TxtOp
 {
-  UI_NavTxtOpFlags flags;
+  UI_TxtOpFlags flags;
   String8 replace;
   String8 copy;
   TxtRng range;
@@ -198,57 +237,58 @@ typedef U64 UI_BoxFlags;
 //- rjf: interaction
 # define UI_BoxFlag_MouseClickable            (UI_BoxFlags)(1ull<<0)
 # define UI_BoxFlag_KeyboardClickable         (UI_BoxFlags)(1ull<<1)
-# define UI_BoxFlag_ClickToFocus              (UI_BoxFlags)(1ull<<2)
-# define UI_BoxFlag_Scroll                    (UI_BoxFlags)(1ull<<3)
-# define UI_BoxFlag_ViewScrollX               (UI_BoxFlags)(1ull<<4)
-# define UI_BoxFlag_ViewScrollY               (UI_BoxFlags)(1ull<<5)
-# define UI_BoxFlag_ViewClampX                (UI_BoxFlags)(1ull<<6)
-# define UI_BoxFlag_ViewClampY                (UI_BoxFlags)(1ull<<7)
-# define UI_BoxFlag_FocusHot                  (UI_BoxFlags)(1ull<<8)
-# define UI_BoxFlag_FocusActive               (UI_BoxFlags)(1ull<<9)
-# define UI_BoxFlag_FocusHotDisabled          (UI_BoxFlags)(1ull<<10)
-# define UI_BoxFlag_FocusActiveDisabled       (UI_BoxFlags)(1ull<<11)
-# define UI_BoxFlag_DefaultFocusNavX          (UI_BoxFlags)(1ull<<12)
-# define UI_BoxFlag_DefaultFocusNavY          (UI_BoxFlags)(1ull<<13)
-# define UI_BoxFlag_DefaultFocusEdit          (UI_BoxFlags)(1ull<<14)
-# define UI_BoxFlag_FocusNavSkip              (UI_BoxFlags)(1ull<<15)
-# define UI_BoxFlag_Disabled                  (UI_BoxFlags)(1ull<<16)
+# define UI_BoxFlag_DropSite                  (UI_BoxFlags)(1ull<<2)
+# define UI_BoxFlag_ClickToFocus              (UI_BoxFlags)(1ull<<3)
+# define UI_BoxFlag_Scroll                    (UI_BoxFlags)(1ull<<4)
+# define UI_BoxFlag_ViewScrollX               (UI_BoxFlags)(1ull<<5)
+# define UI_BoxFlag_ViewScrollY               (UI_BoxFlags)(1ull<<6)
+# define UI_BoxFlag_ViewClampX                (UI_BoxFlags)(1ull<<7)
+# define UI_BoxFlag_ViewClampY                (UI_BoxFlags)(1ull<<8)
+# define UI_BoxFlag_FocusHot                  (UI_BoxFlags)(1ull<<9)
+# define UI_BoxFlag_FocusActive               (UI_BoxFlags)(1ull<<10)
+# define UI_BoxFlag_FocusHotDisabled          (UI_BoxFlags)(1ull<<11)
+# define UI_BoxFlag_FocusActiveDisabled       (UI_BoxFlags)(1ull<<12)
+# define UI_BoxFlag_DefaultFocusNavX          (UI_BoxFlags)(1ull<<13)
+# define UI_BoxFlag_DefaultFocusNavY          (UI_BoxFlags)(1ull<<14)
+# define UI_BoxFlag_DefaultFocusEdit          (UI_BoxFlags)(1ull<<15)
+# define UI_BoxFlag_FocusNavSkip              (UI_BoxFlags)(1ull<<16)
+# define UI_BoxFlag_Disabled                  (UI_BoxFlags)(1ull<<17)
 
 //- rjf: layout
-# define UI_BoxFlag_FloatingX                 (UI_BoxFlags)(1ull<<17)
-# define UI_BoxFlag_FloatingY                 (UI_BoxFlags)(1ull<<18)
-# define UI_BoxFlag_FixedWidth                (UI_BoxFlags)(1ull<<19)
-# define UI_BoxFlag_FixedHeight               (UI_BoxFlags)(1ull<<20)
-# define UI_BoxFlag_AllowOverflowX            (UI_BoxFlags)(1ull<<21)
-# define UI_BoxFlag_AllowOverflowY            (UI_BoxFlags)(1ull<<22)
-# define UI_BoxFlag_SkipViewOffX              (UI_BoxFlags)(1ull<<23)
-# define UI_BoxFlag_SkipViewOffY              (UI_BoxFlags)(1ull<<24)
+# define UI_BoxFlag_FloatingX                 (UI_BoxFlags)(1ull<<18)
+# define UI_BoxFlag_FloatingY                 (UI_BoxFlags)(1ull<<19)
+# define UI_BoxFlag_FixedWidth                (UI_BoxFlags)(1ull<<20)
+# define UI_BoxFlag_FixedHeight               (UI_BoxFlags)(1ull<<21)
+# define UI_BoxFlag_AllowOverflowX            (UI_BoxFlags)(1ull<<22)
+# define UI_BoxFlag_AllowOverflowY            (UI_BoxFlags)(1ull<<23)
+# define UI_BoxFlag_SkipViewOffX              (UI_BoxFlags)(1ull<<24)
+# define UI_BoxFlag_SkipViewOffY              (UI_BoxFlags)(1ull<<25)
 
 //- rjf: appearance / animation
-# define UI_BoxFlag_DrawDropShadow            (UI_BoxFlags)(1ull<<25)
-# define UI_BoxFlag_DrawBackgroundBlur        (UI_BoxFlags)(1ull<<26)
-# define UI_BoxFlag_DrawBackground            (UI_BoxFlags)(1ull<<27)
-# define UI_BoxFlag_DrawBorder                (UI_BoxFlags)(1ull<<28)
-# define UI_BoxFlag_DrawSideTop               (UI_BoxFlags)(1ull<<29)
-# define UI_BoxFlag_DrawSideBottom            (UI_BoxFlags)(1ull<<30)
-# define UI_BoxFlag_DrawSideLeft              (UI_BoxFlags)(1ull<<31)
-# define UI_BoxFlag_DrawSideRight             (UI_BoxFlags)(1ull<<32)
-# define UI_BoxFlag_DrawText                  (UI_BoxFlags)(1ull<<33)
-# define UI_BoxFlag_DrawTextFastpathCodepoint (UI_BoxFlags)(1ull<<34)
-# define UI_BoxFlag_DrawHotEffects            (UI_BoxFlags)(1ull<<35)
-# define UI_BoxFlag_DrawActiveEffects         (UI_BoxFlags)(1ull<<36)
-# define UI_BoxFlag_DrawOverlay               (UI_BoxFlags)(1ull<<37)
-# define UI_BoxFlag_DrawBucket                (UI_BoxFlags)(1ull<<38)
-# define UI_BoxFlag_Clip                      (UI_BoxFlags)(1ull<<39)
-# define UI_BoxFlag_AnimatePosX               (UI_BoxFlags)(1ull<<40)
-# define UI_BoxFlag_AnimatePosY               (UI_BoxFlags)(1ull<<41)
-# define UI_BoxFlag_DisableTextTrunc          (UI_BoxFlags)(1ull<<42)
-# define UI_BoxFlag_DisableIDString           (UI_BoxFlags)(1ull<<43)
-# define UI_BoxFlag_DisableFocusViz           (UI_BoxFlags)(1ull<<44)
-# define UI_BoxFlag_RequireFocusBackground    (UI_BoxFlags)(1ull<<45)
-# define UI_BoxFlag_HasDisplayString          (UI_BoxFlags)(1ull<<46)
-# define UI_BoxFlag_HasFuzzyMatchRanges       (UI_BoxFlags)(1ull<<47)
-# define UI_BoxFlag_RoundChildrenByParent     (UI_BoxFlags)(1ull<<48)
+# define UI_BoxFlag_DrawDropShadow            (UI_BoxFlags)(1ull<<26)
+# define UI_BoxFlag_DrawBackgroundBlur        (UI_BoxFlags)(1ull<<27)
+# define UI_BoxFlag_DrawBackground            (UI_BoxFlags)(1ull<<28)
+# define UI_BoxFlag_DrawBorder                (UI_BoxFlags)(1ull<<29)
+# define UI_BoxFlag_DrawSideTop               (UI_BoxFlags)(1ull<<30)
+# define UI_BoxFlag_DrawSideBottom            (UI_BoxFlags)(1ull<<31)
+# define UI_BoxFlag_DrawSideLeft              (UI_BoxFlags)(1ull<<32)
+# define UI_BoxFlag_DrawSideRight             (UI_BoxFlags)(1ull<<33)
+# define UI_BoxFlag_DrawText                  (UI_BoxFlags)(1ull<<34)
+# define UI_BoxFlag_DrawTextFastpathCodepoint (UI_BoxFlags)(1ull<<35)
+# define UI_BoxFlag_DrawHotEffects            (UI_BoxFlags)(1ull<<36)
+# define UI_BoxFlag_DrawActiveEffects         (UI_BoxFlags)(1ull<<37)
+# define UI_BoxFlag_DrawOverlay               (UI_BoxFlags)(1ull<<38)
+# define UI_BoxFlag_DrawBucket                (UI_BoxFlags)(1ull<<39)
+# define UI_BoxFlag_Clip                      (UI_BoxFlags)(1ull<<40)
+# define UI_BoxFlag_AnimatePosX               (UI_BoxFlags)(1ull<<41)
+# define UI_BoxFlag_AnimatePosY               (UI_BoxFlags)(1ull<<42)
+# define UI_BoxFlag_DisableTextTrunc          (UI_BoxFlags)(1ull<<43)
+# define UI_BoxFlag_DisableIDString           (UI_BoxFlags)(1ull<<44)
+# define UI_BoxFlag_DisableFocusViz           (UI_BoxFlags)(1ull<<45)
+# define UI_BoxFlag_RequireFocusBackground    (UI_BoxFlags)(1ull<<46)
+# define UI_BoxFlag_HasDisplayString          (UI_BoxFlags)(1ull<<47)
+# define UI_BoxFlag_HasFuzzyMatchRanges       (UI_BoxFlags)(1ull<<48)
+# define UI_BoxFlag_RoundChildrenByParent     (UI_BoxFlags)(1ull<<49)
 
 //- rjf: bundles
 # define UI_BoxFlag_Clickable          (UI_BoxFlag_MouseClickable|UI_BoxFlag_KeyboardClickable)
@@ -296,6 +336,7 @@ struct UI_Box
   Vec4F32 overlay_color;
   F_Tag font;
   F32 font_size;
+  F32 tab_size;
   F32 corner_radii[Corner_COUNT];
   F32 blur_size;
   F32 transparency;
@@ -484,8 +525,7 @@ struct UI_State
   //- rjf: build parameters
   UI_IconInfo icon_info;
   OS_Handle window;
-  OS_EventList *events;
-  UI_NavActionList *nav_actions;
+  UI_EventList *events;
   Vec2F32 mouse;
   F32 animation_dt;
   B32 external_focus_commit;
@@ -493,6 +533,7 @@ struct UI_State
   //- rjf: user interaction state
   UI_Key hot_box_key;
   UI_Key active_box_key[UI_MouseButtonKind_COUNT];
+  UI_Key drop_hot_box_key;
   UI_Key clipboard_copy_key;
   U64 press_timestamp_history_us[UI_MouseButtonKind_COUNT][3];
   UI_Key press_key_history[UI_MouseButtonKind_COUNT][3];
@@ -540,22 +581,18 @@ internal UI_Key  ui_key_from_stringf(UI_Key seed_key, char *fmt, ...);
 internal B32     ui_key_match(UI_Key a, UI_Key b);
 
 ////////////////////////////////
-//~ rjf: Navigation Action List Building & Consumption Functions
+//~ rjf: Event Type Functions
 
-internal void ui_nav_action_list_push(Arena *arena, UI_NavActionList *list, UI_NavAction action);
-internal void ui_nav_eat_action_node(UI_NavActionList *list, UI_NavActionNode *node);
-
-////////////////////////////////
-//~ rjf: High Level Navigation Action => Text Operations
-
-internal B32 ui_nav_char_is_scan_boundary(U8 c);
-internal S64 ui_nav_scanned_column_from_column(String8 string, S64 start_column, Side side);
-internal UI_NavTxtOp ui_nav_single_line_txt_op_from_action(Arena *arena, UI_NavAction action, String8 line, TxtPt cursor, TxtPt mark);
+internal UI_EventNode *ui_event_list_push(Arena *arena, UI_EventList *list, UI_Event *v);
+internal void ui_eat_event(UI_EventList *list, UI_EventNode *node);
 
 ////////////////////////////////
-//~ rjf: Single-Line String Modification
+//~ rjf: Text Operation Functions
 
-internal String8 ui_nav_push_string_replace_range(Arena *arena, String8 string, Rng1S64 col_range, String8 replace);
+internal B32 ui_char_is_scan_boundary(U8 c);
+internal S64 ui_scanned_column_from_column(String8 string, S64 start_column, Side side);
+internal UI_TxtOp ui_single_line_txt_op_from_event(Arena *arena, UI_Event *event, String8 string, TxtPt cursor, TxtPt mark);
+internal String8 ui_push_string_replace_range(Arena *arena, String8 string, Rng1S64 range, String8 replace);
 
 ////////////////////////////////
 //~ rjf: Size Type Functions
@@ -609,12 +646,17 @@ internal UI_State *ui_get_selected_state(void);
 //- rjf: per-frame info
 internal Arena *           ui_build_arena(void);
 internal OS_Handle         ui_window(void);
-internal OS_EventList *    ui_events(void);
-internal UI_NavActionList *ui_nav_actions(void);
+internal UI_EventList *    ui_events(void);
 internal Vec2F32           ui_mouse(void);
 internal F_Tag             ui_icon_font(void);
 internal String8           ui_icon_string_from_kind(UI_IconKind icon_kind);
 internal F32               ui_dt(void);
+
+//- rjf: event consumption helpers
+internal B32 ui_key_press(OS_EventFlags mods, OS_Key key);
+internal B32 ui_key_release(OS_EventFlags mods, OS_Key key);
+internal B32 ui_text(U32 character);
+internal B32 ui_slot_press(UI_EventActionSlot slot);
 
 //- rjf: drag data
 internal Vec2F32           ui_drag_start_mouse(void);
@@ -631,6 +673,7 @@ internal D_FancyRunList    ui_string_hover_runs(Arena *arena);
 //- rjf: interaction keys
 internal UI_Key            ui_hot_key(void);
 internal UI_Key            ui_active_key(UI_MouseButtonKind button_kind);
+internal UI_Key            ui_drop_hot_key(void);
 
 //- rjf: controls over interaction
 internal void              ui_kill_action(void);
@@ -641,7 +684,7 @@ internal UI_Box *          ui_box_from_key(UI_Key key);
 ////////////////////////////////
 //~ rjf: Top-Level Building API
 
-internal void ui_begin_build(OS_EventList *events, OS_Handle window, UI_NavActionList *nav_actions, UI_IconInfo *icon_info, F32 real_dt, F32 animation_dt);
+internal void ui_begin_build(OS_Handle window, UI_EventList *events, UI_IconInfo *icon_info, F32 real_dt, F32 animation_dt);
 internal void ui_end_build(void);
 internal void ui_calc_sizes_standalone__in_place_rec(UI_Box *root, Axis2 axis);
 internal void ui_calc_sizes_upwards_dependent__in_place_rec(UI_Box *root, Axis2 axis);
@@ -685,7 +728,7 @@ internal UI_Box *          ui_build_box_from_stringf(UI_BoxFlags flags, char *fm
 
 //- rjf: box node equipment
 internal inline void       ui_box_equip_display_string(UI_Box *box, String8 string);
-internal inline void       ui_box_equip_display_fancy_strings(UI_Box *box, D_FancyStringList *strings);
+internal inline void       ui_box_equip_display_fancy_strings(UI_Box *box, F32 tab_size, D_FancyStringList *strings);
 internal inline void       ui_box_equip_display_string_fancy_runs(UI_Box *box, String8 string, D_FancyRunList *runs);
 internal inline void       ui_box_equip_fuzzy_match_ranges(UI_Box *box, FuzzyMatchRangeList *matches);
 internal inline void       ui_box_equip_draw_bucket(UI_Box *box, D_Bucket *bucket);
@@ -896,6 +939,7 @@ internal void     ui_pop_corner_radius(void);
 #define UI_HoverCursor(v) DeferLoop(ui_push_hover_cursor(v), ui_pop_hover_cursor())
 #define UI_Font(v) DeferLoop(ui_push_font(v), ui_pop_font())
 #define UI_FontSize(v) DeferLoop(ui_push_font_size(v), ui_pop_font_size())
+#define UI_TabSize(v) DeferLoop(ui_push_tab_size(v), ui_pop_tab_size())
 #define UI_CornerRadius00(v) DeferLoop(ui_push_corner_radius_00(v), ui_pop_corner_radius_00())
 #define UI_CornerRadius01(v) DeferLoop(ui_push_corner_radius_01(v), ui_pop_corner_radius_01())
 #define UI_CornerRadius10(v) DeferLoop(ui_push_corner_radius_10(v), ui_pop_corner_radius_10())

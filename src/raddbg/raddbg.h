@@ -2,30 +2,18 @@
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 ////////////////////////////////
-//~ rjf: Demon/Cleanup Pass Tasks
-//
-// [ ] TLS eval -> in-process-memory EXE info
-// [ ] unwinding -> in-process-memory EXE info
-// [ ] "root" concept in hash store, which buckets keys & allows usage code to
-//     jettison a collection of keys in retained mode fashion
-
-////////////////////////////////
 //~ rjf: Frontend/UI Pass Tasks
 //
+// [ ] display threads at their last exception address, rather than current
+// rip, if applicable
+//
+// [ ] editing multiple bindings for commands
 // [ ] n-row table selection, in watch window & other UIs, multi-selection
 //     ctrl+C
-// [ ] UI_NavActions, OS_Event -> UI_Event (single event stream)
 //
-// [ ] better discoverability for view rules - have better help hover tooltip,
-//     info on arguments, and better autocomplete lister
-//
-// [ ] source view -> floating margin/line-nums
 // [ ] theme colors -> more explicit about e.g. opaque backgrounds vs. floating
 //     & scrollbars etc.
-// [ ] drag/drop tab cleanup
 // [ ] target/breakpoint/watch-pin reordering
-// [ ] watch window reordering
-// [ ] standard way to filter
 // [ ] visualize remapped files (via path map)
 // [ ] theme lister -> fonts & font sizes
 // [ ] font lister
@@ -41,9 +29,6 @@
 //     that you use to tag them. Just some way that would make it easier to
 //     focus on your own threads.
 //
-// [ ] autocomplete lister should respect position in edited expression,
-//     tabbing through should autocomplete but not exit, etc.
-//
 //  [ ]  it would be nice to have "show in explorer" for right click on source
 //       file tab (opens explorer & selects the file)
 //
@@ -51,42 +36,48 @@
 //       different color? can I turn it off? And why sometimes digits in number
 //       start with brighter color, but sometimes with darker - shouldn't it
 //       always have the same color ordering?
-//
-// [ ] pipe failure-to-launch errors back to frontend
 
 ////////////////////////////////
 //~ rjf: Hot, High Priority Tasks (Complete Unusability, Crashes, Fire-Worthy)
 //
-// [ ] raddbg jai.exe my_file.jai -- foobar -> raddbg consumes `--` incorrectly
+// [ ] investigate heavy outputdebugstring usage causing major issues
+//     (both in debugger and in target application, apparently)
+// [ ] "Browse..." buttons should adopt a more relevant starting search path,
+//     if possible
 // [ ] PDB files distributed with the build are not found by DbgHelp!!!
 // [ ] Jai compiler debugging crash
-// [ ] raddbgi file regeneration too strict
 //
 // [ ] Jump table thunks, on code w/o /INCREMENTAL:NO
-//
-// [ ] ** Thread/process control bullet-proofing, including solo-step mode
-//
-// [ ] ** In solo-stepping mode, if I step over something like CreateFileA, it
-//     pseudo-hangs the debugger. I can't seem to do anything else, including
-//     "Kill All". I have to close the debugger and restart it, AFAICT?
-//
-// [ ] ** I tried to debug a console program, and "step into" didn't seem to
-//     work. Instead, it just started running the program, but the program
-//     seemed to hang, and then the debugger pseudo-hung with a continual
-//     progress bar in the disassembly window. I had to close and restart. Is
-//     console app debugging not working yet, perhaps?
 //
 // [ ] Setting the code_font/main_font values to a font name doesn't work.
 //     Should probably make note that you have to set it to a path to a TTF,
 //     since that's not normally how Windows fonts work.
-//
-// [ ] ** Converter performance & heuristics for asynchronously doing it early
 
 ////////////////////////////////
 //~ rjf: Hot, Medium Priority Tasks (Low-Hanging-Fruit Features, UI Jank, Cleanup)
 //
+// [ ] "root" concept in hash store, which buckets keys & allows usage code to
+//     jettison a collection of keys in retained mode fashion
+//
+// [ ] Jeff Notes
+//  [ ] highlighted text & ctrl+f -> auto-fill search query
+//  [ ] double-click any part of frame in callstack view -> snap to function
+//  [ ] sort locals by appearance in source code (or maybe just debug info)
+//  [ ] sum view rule
+//  [ ] plot view rule
+//  [ ] histogram view rule
+//  [ ] max view rule
+//  [ ] min view rule
+//  [ ] double click on procedure in procedures tab to jump to source
+//
+// [ ] filesystem drag/drop support
+// [ ] double-click vs. single-click for folder navigation, see if we can infer
+// [ ] use backslashes on windows by default, forward slashes elsewhere
+//
 // [ ] investigate /DEBUG:FASTLINK - can we somehow alert that we do not
 //     support it?
+//
+// [ ] ** Converter performance & heuristics for asynchronously doing it early
 //
 // [ ] visualize conversion failures
 //
@@ -139,23 +130,10 @@
 //      have alternating bright/dim letters to show sections of a number. Is
 //      this in the theme colors somewhere?
 //
-//  [ ] ** I couldn't figure out how to really view threads in the debugger.
-//      The only place I found a thread list was in "The Scheduler", but it
-//      only lists threads by ID, which is hard to use. I can hover over them
-//      to get the stack, which helps, but it would be much nicer if the top
-//      function was displayed in the window by default next to the thread.
-//  [ ] ** It would be nice if thread listings displayed the name of the
-//      thread, instead of just the ID.
-//
 //  [ ] ** Scrollbars are barely visible for me, for some reason. I could not
 //      find anything in the theme that would fill them with a solid, bright
 //      color. Instead they are just a thin outline and the same color as the
 //      scroll bar background.
-//
-//  [ ] Dragging a window tab (like Locals or Registers or whatnot) and
-//      canceling with ESC should revert the window tab to where it was.
-//      Currently, it leaves the window tab reordered if you dragged over its
-//      window and shuffled its position.
 //
 //  [ ] Many of the UI elements, like the menus, would like better if they had
 //      a little bit of margin. Having the text right next to the edges, and
@@ -182,23 +160,17 @@
 //      item, then releasing, does not trigger that item as expected. Instead,
 //      it is a nop, and it waits for you to click again on the item.
 //
-//  [ ] Working with panels felt cumbersome. I couldn't figure out any way to
-//      quickly arrange the display without manually selecting "split panel"
-//      and "close panel" and stuff from the menu, which took a long time.
-//   - @polish @feature ui for dragging tab -> bundling panel split options
-//
 //  [ ] I found the "context menu" convention to be confusing. For example, if
 //      I left-click on a tab, it selects the tab. If I right-click on a tab,
 //      it opens the context menu. However, if I left-click on a module, it
 //      opens the context window. It seems like maybe menus should be right,
 //      and left should do the default action, more consistently?
 //
-//  [ ] It wasn't clear to me how you save a user or profile file. I can see
+//  [ ] It wasn't clear to me how you save a user or project file. I can see
 //      how to load them, but not how you save them. Obviously I can just copy
 //      the files myself in the shell, but it seemed weird that there was no
 //      "save" option in the menus.
 //
-// [ ] @cleanup @feature double & triple click select in source views
 // [ ] @feature debug info overrides (both path-based AND module-based)
 // [ ] configure tab size
 // [ ] auto-scroll output window
@@ -220,11 +192,6 @@
 //      breakpoint color, so you can't really control the line drawing? I might
 //      be fine with them, but they would have to be much more light (like
 //      alpha 0.1 or something)
-//
-//  [ ] It's confusing that ENTER is the way you expand and collapse things in
-//      the watch window, but then also how you edit them if they are not
-//      expandable? It seems like this should be consistent (one way to edit,
-//      one way to expand/collapse, that are distinct)
 //
 //  [ ] The hex format for color values in the config file was a real
 //      mindbender. It's prefixed with "0x", so I was assuming it was either
@@ -250,16 +217,10 @@
 //  [ ]  can it ignore stepping into _RTC_CheckStackVars generated functions?
 //  [ ]  mouse back button should make view to go back after I double clicked
 //       on function to open it
-//  [ ]  pressing random keyboard keys in source code advances text cursor like
-//       you were inputting text, very strange.
 //  [ ]  Alt+8 to switch to disassembly would be nice (regardless on which
 //       panel was previous, don't want to use ctrl+, multiple times)
 //       Alt+8 for disasm and Alt+6 for memory view are shortcuts I often use
 //       in VS
-//  [ ]  in watch window when I enter some new expression and then click mouse
-//       away from cell, then it should behave the same as if I pressed enter.
-//       Currently it does the same as if I have pressed esc and I have lost my
-//       expression
 //  [ ]  default font size is too small for me - not only source code, but
 //       menus/tab/watch names (which don't resize). Maybe you could query
 //       Windows for initial font size?
@@ -315,8 +276,6 @@
 // [ ] @bug view-snapping in scroll-lists, accounting for mapping between
 //     visual positions & logical positions (variably sized rows in watch,
 //     table headers, etc.)
-// [ ] @bug selected frame should be keyed by run_idx or something so that it
-//     can gracefully reset to the top frame when running
 // [ ] @cleanup collapse DF_CfgNodes into just being MD trees, find another way
 //     to encode config source - don't need it at every node
 // [ ] @cleanup straighten out index/number space & types & terminology for
@@ -335,11 +294,8 @@
 //     when editing)
 // [ ] @feature eval system -> somehow evaluate breakpoint hit counts? "meta"
 //     variables?
-// [ ] @feature watch window labels
-// [ ] @feature scheduler -> thread grid view?
 //
 // [ ] @feature disasm view improvement features
-//  [ ] interleaved src/dasm view
 //  [ ] visualize jump destinations in disasm
 //
 // [ ] @feature eval ui improvement features
@@ -375,14 +331,6 @@
 // [ ] fancy string runs can include "weakness" information for text truncation
 //     ... can prioritize certain parts of strings to be truncated before
 //     others. would be good for e.g. the middle of a path
-// [ ] ui code maintenance, simplification, design, & robustness pass
-//  [ ] page-up & page-down correct handling in keyboard nav
-//  [ ] collapse context menus & command lister into same codepaths. filter by
-//      context. parameterize by context.
-//  [ ] collapse text cells & command lister & etc. into same codepath (?)
-//  [ ] nested context menus
-//  [ ] unified top-level cursor/typing/lister helper
-//  [ ] font selection lister
 // [ ] font cache eviction (both for font tags, closing fp handles, and
 //     rasterizations)
 // [ ] frontend speedup opportunities
@@ -397,20 +345,48 @@
 ////////////////////////////////
 //~ rjf: Recently Completed Task Log
 //
-// [x] solidify synchronization mechanisms for usage of demon layer
-// [x] TLS eval correctness
-// [x] freezing thread while running -> soft-halt
-// [x] Watch Window Filtering
-// [x] @feature disasm keyboard navigation & copy/paste
-// [x] run-to-line needs to work if no processes are running
-//     - place temp bp, attach "die on hit" flag or something like that?
-// [x] disasm animation & go-to-address
-//  [x]  middle mouse button on tab should close it
-//  [x] I didn't understand the terminology "Equip With Color". Does that just
-//      mean specify the color used to display it? Is "Apply Color" perhaps a
-//      bit more user-friendly?
-//
-//  [x] The cursor feels a bit too huge vertically.
+// [x] UI_NavActions, OS_Event -> UI_Event (single event stream)
+// [x] better discoverability for view rules - have better help hover tooltip,
+//     info on arguments, and better autocomplete lister
+// [x] source view -> floating margin/line-nums
+// [x] watch window reordering
+// [x] standard way to filter
+// [x] autocomplete lister should respect position in edited expression,
+//     tabbing through should autocomplete but not exit, etc.
+// [x] pipe failure-to-launch errors back to frontend
+//  [x] bit more padding on the tabs
+//  [x] unified top-level cursor/typing/lister helper
+//  [x] collapse text cells & command lister & etc. into same codepath (?)
+//  [x] page-up & page-down correct handling in keyboard nav
+//  [x] interleaved src/dasm view
+//  [x]  in watch window when I enter some new expression and then click mouse
+//       away from cell, then it should behave the same as if I pressed enter.
+//       Currently it does the same as if I have pressed esc and I have lost my
+//       expression
+//  [x]  pressing random keyboard keys in source code advances text cursor like
+//       you were inputting text, very strange.
+//  [x] It's confusing that ENTER is the way you expand and collapse things in
+//      the watch window, but then also how you edit them if they are not
+//      expandable? It seems like this should be consistent (one way to edit,
+//      one way to expand/collapse, that are distinct)
+//  [x] Dragging a window tab (like Locals or Registers or whatnot) and
+//      canceling with ESC should revert the window tab to where it was.
+//      Currently, it leaves the window tab reordered if you dragged over its
+//      window and shuffled its position.
+//  [x] ** I couldn't figure out how to really view threads in the debugger.
+//      The only place I found a thread list was in "The Scheduler", but it
+//      only lists threads by ID, which is hard to use. I can hover over them
+//      to get the stack, which helps, but it would be much nicer if the top
+//      function was displayed in the window by default next to the thread.
+//  [x] ** It would be nice if thread listings displayed the name of the
+//      thread, instead of just the ID.
+// [x] TLS eval -> in-process-memory EXE info
+// [x] unwinding -> in-process-memory EXE info
+// [x] new fuzzy searching layer
+// [x] robustify dbgi layer to renames (cache should not be based only on
+//     path - must invalidate naturally when new filetime occurs)
+// [x] rdi file regeneration too strict
+// [x] raddbg jai.exe my_file.jai -- foobar -> raddbg consumes `--` incorrectly
 
 #ifndef RADDBG_H
 #define RADDBG_H
@@ -436,12 +412,25 @@ struct IPCInfo
 ////////////////////////////////
 //~ rjf: Globals
 
-#define IPC_SHARED_MEMORY_BUFFER_SIZE MB(16)
+//- rjf: IPC resources
+#define IPC_SHARED_MEMORY_BUFFER_SIZE MB(4)
 StaticAssert(IPC_SHARED_MEMORY_BUFFER_SIZE > sizeof(IPCInfo), ipc_buffer_size_requirement);
-read_only global String8 ipc_shared_memory_name = str8_lit_comp("_raddbg_ipc_shared_memory_");
-read_only global String8 ipc_semaphore_name = str8_lit_comp("_raddbg_ipc_semaphore_");
+global OS_Handle ipc_signal_semaphore = {0};
+global OS_Handle ipc_lock_semaphore = {0};
+global U8 *ipc_shared_memory_base = 0;
+global U8  ipc_s2m_ring_buffer[MB(4)] = {0};
+global U64 ipc_s2m_ring_write_pos = 0;
+global U64 ipc_s2m_ring_read_pos = 0;
+global OS_Handle ipc_s2m_ring_mutex = {0};
+global OS_Handle ipc_s2m_ring_cv = {0};
+
+//- rjf: frame time history
 global U64 frame_time_us_history[64] = {0};
 global U64 frame_time_us_history_idx = 0;
+
+//- rjf: main thread log
+global Log *main_thread_log = 0;
+global String8 main_thread_log_path = {0};
 
 ////////////////////////////////
 //~ rjf: Frontend Entry Points
