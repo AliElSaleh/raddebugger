@@ -1,24 +1,24 @@
-## --- Usage Notes (2024/1/10) ------------------------------------------------
+# --- Usage Notes (2024/1/10) ------------------------------------------------
+.Help {
+  This is a central build script for the RAD Debugger project. It takes a list
+  of simple alphanumeric-only arguments which control 
+     (a) what is built
+     (b) which compiler & linker are used
+     (c) extra high-level build options.
+         By default, if no options are passed, then the main "raddbg" graphical debugger is built.
 
- This is a central build script for the RAD Debugger project. It takes a list
- of simple alphanumeric-only arguments which control 
-    (a) what is built
-    (b) which compiler & linker are used
-    (c) extra high-level build options. By default, if no options are passed, then the main "raddbg" graphical debugger is built.
+  Below is a non-exhaustive list of possible ways to use the script:
+  - riftbuild
+  - riftbuild cl
+  - riftbuild release
+  - riftbuild asan telemetry
+  - riftbuild rdi_from_pdb
 
- Below is a non-exhaustive list of possible ways to use the script:
- - riftbuild
- - riftbuild cl
- - riftbuild release
- - riftbuild asan telemetry
- - riftbuild rdi_from_pdb
-
- Below is a list of all possible non-target command line options:
-
- - asan      : enable address sanitizer
- - telemetry : enable RAD telemetry profiling support
-
-## ---------------------------------------------------------------------------
+  Below is a list of all possible non-target command line options:
+  - asan      : enable address sanitizer
+  - telemetry : enable RAD telemetry profiling support
+}
+# ---------------------------------------------------------------------------
 
 FinalName raddbg
 
@@ -137,3 +137,9 @@ if release {
     Defines       $DebugDefines
 }
 
+AssertArchitecture x64
+AssertPlatform     Windows
+Architecture.x86.ErrorMessage {
+    You tried to build in x86 (%_bit bit) mode, but currently,
+    only building in x64 (64 bit) mode is supported.
+}
