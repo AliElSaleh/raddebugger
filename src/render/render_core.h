@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 #ifndef RENDER_CORE_H
@@ -29,9 +29,9 @@ enum
 typedef union R_Handle R_Handle;
 union R_Handle
 {
-  U64 u64[2];
-  U32 u32[4];
-  U16 u16[8];
+  U64 u64[1];
+  U32 u32[2];
+  U16 u16[4];
 };
 
 ////////////////////////////////
@@ -151,6 +151,7 @@ typedef struct R_PassParams_Blur R_PassParams_Blur;
 struct R_PassParams_Blur
 {
   Rng2F32 rect;
+  Rng2F32 clip;
   F32 blur_size;
   F32 corner_radii[Corner_COUNT];
 };
@@ -192,6 +193,11 @@ struct R_PassList
   R_PassNode *last;
   U64 count;
 };
+
+////////////////////////////////
+//~ rjf: Helpers
+
+internal Mat4x4F32 r_sample_channel_map_from_tex2dformat(R_Tex2DFormat fmt);
 
 ////////////////////////////////
 //~ rjf: Handle Type Functions

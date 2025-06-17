@@ -1,8 +1,5 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
-
-#undef RADDBG_LAYER_COLOR
-#define RADDBG_LAYER_COLOR 0.80f, 0.60f, 0.20f
 
 ////////////////////////////////
 //~ rjf: Input Layout Element Tables
@@ -39,7 +36,7 @@ internal R_D3D11_Window *
 r_d3d11_window_from_handle(R_Handle handle)
 {
   R_D3D11_Window *window = (R_D3D11_Window *)handle.u64[0];
-  if(window->generation != handle.u64[1])
+  if(window == 0)
   {
     window = &r_d3d11_window_nil;
   }
@@ -51,7 +48,6 @@ r_d3d11_handle_from_window(R_D3D11_Window *window)
 {
   R_Handle handle = {0};
   handle.u64[0] = (U64)window;
-  handle.u64[1] = window->generation;
   return handle;
 }
 
@@ -59,7 +55,7 @@ internal R_D3D11_Tex2D *
 r_d3d11_tex2d_from_handle(R_Handle handle)
 {
   R_D3D11_Tex2D *texture = (R_D3D11_Tex2D *)handle.u64[0];
-  if(texture == 0 || texture->generation != handle.u64[1])
+  if(texture == 0)
   {
     texture = &r_d3d11_tex2d_nil;
   }
@@ -71,7 +67,6 @@ r_d3d11_handle_from_tex2d(R_D3D11_Tex2D *texture)
 {
   R_Handle handle = {0};
   handle.u64[0] = (U64)texture;
-  handle.u64[1] = texture->generation;
   return handle;
 }
 
@@ -79,7 +74,7 @@ internal R_D3D11_Buffer *
 r_d3d11_buffer_from_handle(R_Handle handle)
 {
   R_D3D11_Buffer *buffer = (R_D3D11_Buffer *)handle.u64[0];
-  if(buffer == 0 || buffer->generation != handle.u64[1])
+  if(buffer == 0)
   {
     buffer = &r_d3d11_buffer_nil;
   }
@@ -91,7 +86,6 @@ r_d3d11_handle_from_buffer(R_D3D11_Buffer *buffer)
 {
   R_Handle handle = {0};
   handle.u64[0] = (U64)buffer;
-  handle.u64[1] = buffer->generation;
   return handle;
 }
 
@@ -168,6 +162,7 @@ r_init(CmdLine *cmdln)
   r_d3d11_state->device_rw_mutex = os_rw_mutex_alloc();
   
   //- rjf: create base device
+  ProfBegin("create base device");
   UINT creation_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #if BUILD_DEBUG
   if(cmd_line_has_flag(cmdln, str8_lit("d3d11_debug")))
@@ -199,18 +194,18 @@ r_init(CmdLine *cmdln)
                               D3D11_SDK_VERSION,
                               &r_d3d11_state->base_device, 0, &r_d3d11_state->base_device_ctx);
   }
-  
   if(FAILED(error))
   {
     char buffer[256] = {0};
     raddbg_snprintf(buffer, sizeof(buffer), "D3D11 device creation failure (%lx). The process is terminating.", error);
     os_graphical_message(1, str8_lit("Fatal Error"), str8_cstring(buffer));
-    os_exit_process(1);
+    os_abort(1);
   }
+  ProfEnd();
   
   //- rjf: enable break-on-error
 #if BUILD_DEBUG
-  if(cmd_line_has_flag(cmdln, str8_lit("d3d11_debug")))
+  if(cmd_line_has_flag(cmdln, str8_lit("d3d11_debug"))) ProfScope("enable break-on-error")
   {
     ID3D11InfoQueue *info = 0;
     error = r_d3d11_state->base_device->lpVtbl->QueryInterface(r_d3d11_state->base_device, &IID_ID3D11InfoQueue, (void **)(&info));
@@ -224,15 +219,20 @@ r_init(CmdLine *cmdln)
 #endif
   
   //- rjf: get main device
+  ProfBegin("get main device");
   error = r_d3d11_state->base_device->lpVtbl->QueryInterface(r_d3d11_state->base_device, &IID_ID3D11Device1, (void **)(&r_d3d11_state->device));
   error = r_d3d11_state->base_device_ctx->lpVtbl->QueryInterface(r_d3d11_state->base_device_ctx, &IID_ID3D11DeviceContext1, (void **)(&r_d3d11_state->device_ctx));
+  ProfEnd();
   
   //- rjf: get dxgi device/adapter/factory
+  ProfBegin("get dxgi device/adapter/factory");
   error = r_d3d11_state->device->lpVtbl->QueryInterface(r_d3d11_state->device, &IID_IDXGIDevice1, (void **)(&r_d3d11_state->dxgi_device));
   error = r_d3d11_state->dxgi_device->lpVtbl->GetAdapter(r_d3d11_state->dxgi_device, &r_d3d11_state->dxgi_adapter);
   error = r_d3d11_state->dxgi_adapter->lpVtbl->GetParent(r_d3d11_state->dxgi_adapter, &IID_IDXGIFactory2, (void **)(&r_d3d11_state->dxgi_factory));
+  ProfEnd();
   
   //- rjf: create main rasterizer
+  ProfScope("create main rasterizer")
   {
     D3D11_RASTERIZER_DESC1 desc = {D3D11_FILL_SOLID};
     {
@@ -244,6 +244,7 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: create main blend state
+  ProfScope("create main blend state")
   {
     D3D11_BLEND_DESC desc = {0};
     {
@@ -259,6 +260,8 @@ r_init(CmdLine *cmdln)
     error = r_d3d11_state->device->lpVtbl->CreateBlendState(r_d3d11_state->device, &desc, &r_d3d11_state->main_blend_state);
   }
   
+  //- rjf: create empty blend state
+  ProfScope("create empty blend state")
   {
     D3D11_BLEND_DESC desc = {0};
     {
@@ -269,6 +272,7 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: create nearest-neighbor sampler
+  ProfScope("create nearest-neighbor sampler")
   {
     D3D11_SAMPLER_DESC desc = zero_struct;
     {
@@ -282,6 +286,7 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: create bilinear sampler
+  ProfScope("create bilinear sampler")
   {
     D3D11_SAMPLER_DESC desc = zero_struct;
     {
@@ -295,6 +300,7 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: create noop depth/stencil state
+  ProfScope("create noop depth/stencil state")
   {
     D3D11_DEPTH_STENCIL_DESC desc = {0};
     {
@@ -306,6 +312,7 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: create plain depth/stencil state
+  ProfScope("create plain depth/stencil state")
   {
     D3D11_DEPTH_STENCIL_DESC desc = {0};
     {
@@ -317,6 +324,7 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: create buffers
+  ProfScope("create buffers")
   {
     D3D11_BUFFER_DESC desc = {0};
     {
@@ -329,9 +337,10 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: build vertex shaders & input layouts
-  for(R_D3D11_VShadKind kind = (R_D3D11_VShadKind)0;
-      kind < R_D3D11_VShadKind_COUNT;
-      kind = (R_D3D11_VShadKind)(kind+1))
+  ProfScope("build vertex shaders & input layouts")
+    for(R_D3D11_VShadKind kind = (R_D3D11_VShadKind)0;
+        kind < R_D3D11_VShadKind_COUNT;
+        kind = (R_D3D11_VShadKind)(kind+1))
   {
     String8 source = *r_d3d11_g_vshad_kind_source_table[kind];
     String8 source_name = r_d3d11_g_vshad_kind_source_name_table[kind];
@@ -342,6 +351,7 @@ r_init(CmdLine *cmdln)
     ID3DBlob *vshad_source_blob = 0;
     ID3DBlob *vshad_source_errors = 0;
     ID3D11VertexShader *vshad = 0;
+    ProfScope("compile vertex shader")
     {
       error = D3DCompile(source.str,
                          source.size,
@@ -396,6 +406,7 @@ r_init(CmdLine *cmdln)
     ID3DBlob *pshad_source_blob = 0;
     ID3DBlob *pshad_source_errors = 0;
     ID3D11PixelShader *pshad = 0;
+    ProfScope("compile pixel shader")
     {
       error = D3DCompile(source.str,
                          source.size,
@@ -428,9 +439,10 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: build uniform type buffers
-  for(R_D3D11_UniformTypeKind kind = (R_D3D11_UniformTypeKind)0;
-      kind < R_D3D11_UniformTypeKind_COUNT;
-      kind = (R_D3D11_UniformTypeKind)(kind+1))
+  ProfScope("build uniform type buffers")
+    for(R_D3D11_UniformTypeKind kind = (R_D3D11_UniformTypeKind)0;
+        kind < R_D3D11_UniformTypeKind_COUNT;
+        kind = (R_D3D11_UniformTypeKind)(kind+1))
   {
     ID3D11Buffer *buffer = 0;
     {
@@ -449,6 +461,7 @@ r_init(CmdLine *cmdln)
   }
   
   //- rjf: create backup texture
+  ProfScope("create backup texture")
   {
     U32 backup_texture_data[] =
     {
@@ -495,8 +508,8 @@ r_window_equip(OS_Handle handle)
     //- rjf: map os window handle -> hwnd
     HWND hwnd = {0};
     {
-      W32_Window *w32_layer_window = w32_window_from_os_window(handle);
-      hwnd = w32_hwnd_from_window(w32_layer_window);
+      OS_W32_Window *w32_layer_window = os_w32_window_from_handle(handle);
+      hwnd = os_w32_hwnd_from_window(w32_layer_window);
     }
     
     //- rjf: create swapchain
@@ -504,7 +517,7 @@ r_window_equip(OS_Handle handle)
     {
       swapchain_desc.Width              = 0; // NOTE(rjf): use window width
       swapchain_desc.Height             = 0; // NOTE(rjf): use window height
-      swapchain_desc.Format             = DXGI_FORMAT_B8G8R8A8_UNORM;
+      swapchain_desc.Format             = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
       swapchain_desc.Stereo             = FALSE;
       swapchain_desc.SampleDesc.Count   = 1;
       swapchain_desc.SampleDesc.Quality = 0;
@@ -521,7 +534,7 @@ r_window_equip(OS_Handle handle)
       char buffer[256] = {0};
       raddbg_snprintf(buffer, sizeof(buffer), "DXGI swap chain creation failure (%lx). The process is terminating.", error);
       os_graphical_message(1, str8_lit("Fatal Error"), str8_cstring(buffer));
-      os_exit_process(1);
+      os_abort(1);
     }
     
     r_d3d11_state->dxgi_factory->lpVtbl->MakeWindowAssociation(r_d3d11_state->dxgi_factory, hwnd, DXGI_MWA_NO_ALT_ENTER);
@@ -657,7 +670,10 @@ r_tex2d_release(R_Handle handle)
   OS_MutexScopeW(r_d3d11_state->device_rw_mutex)
   {
     R_D3D11_Tex2D *texture = r_d3d11_tex2d_from_handle(handle);
-    SLLStackPush(r_d3d11_state->first_to_free_tex2d, texture);
+    if(texture != &r_d3d11_tex2d_nil)
+    {
+      SLLStackPush(r_d3d11_state->first_to_free_tex2d, texture);
+    }
   }
   ProfEnd();
 }
@@ -690,15 +706,18 @@ r_fill_tex2d_region(R_Handle handle, Rng2S32 subrect, void *data)
   OS_MutexScopeW(r_d3d11_state->device_rw_mutex)
   {
     R_D3D11_Tex2D *texture = r_d3d11_tex2d_from_handle(handle);
-    Assert(texture->kind == R_ResourceKind_Dynamic && "only dynamic texture can update region");
-    U64 bytes_per_pixel = r_tex2d_format_bytes_per_pixel_table[texture->format];
-    Vec2S32 dim = v2s32(subrect.x1 - subrect.x0, subrect.y1 - subrect.y0);
-    D3D11_BOX dst_box =
+    if(texture != &r_d3d11_tex2d_nil)
     {
-      (UINT)subrect.x0, (UINT)subrect.y0, 0,
-      (UINT)subrect.x1, (UINT)subrect.y1, 1,
-    };
-    r_d3d11_state->device_ctx->lpVtbl->UpdateSubresource(r_d3d11_state->device_ctx, (ID3D11Resource *)texture->texture, 0, &dst_box, data, dim.x*bytes_per_pixel, 0);
+      Assert(texture->kind == R_ResourceKind_Dynamic && "only dynamic texture can update region");
+      U64 bytes_per_pixel = r_tex2d_format_bytes_per_pixel_table[texture->format];
+      Vec2S32 dim = v2s32(subrect.x1 - subrect.x0, subrect.y1 - subrect.y0);
+      D3D11_BOX dst_box =
+      {
+        (UINT)subrect.x0, (UINT)subrect.y0, 0,
+        (UINT)subrect.x1, (UINT)subrect.y1, 1,
+      };
+      r_d3d11_state->device_ctx->lpVtbl->UpdateSubresource(r_d3d11_state->device_ctx, (ID3D11Resource *)texture->texture, 0, &dst_box, data, dim.x*bytes_per_pixel, 0);
+    }
   }
   ProfEnd();
 }
@@ -806,6 +825,8 @@ r_end_frame(void)
       next = tex->next;
       tex->view->lpVtbl->Release(tex->view);
       tex->texture->lpVtbl->Release(tex->texture);
+      tex->view = 0;
+      tex->texture = 0;
       tex->generation += 1;
       SLLStackPush(r_d3d11_state->first_free_tex2d, tex);
     }
@@ -872,7 +893,7 @@ r_window_begin_frame(OS_Handle window, R_Handle window_equip)
         D3D11_TEXTURE2D_DESC color_desc = zero_struct;
         {
           wnd->framebuffer->lpVtbl->GetDesc(wnd->framebuffer, &color_desc);
-          color_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+          color_desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
           color_desc.BindFlags = D3D11_BIND_RENDER_TARGET|D3D11_BIND_SHADER_RESOURCE;
         }
         D3D11_RENDER_TARGET_VIEW_DESC rtv_desc = zero_struct;
@@ -882,7 +903,7 @@ r_window_begin_frame(OS_Handle window, R_Handle window_equip)
         }
         D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc = zero_struct;
         {
-          srv_desc.Format                    = DXGI_FORMAT_R8G8B8A8_UNORM;
+          srv_desc.Format                    = DXGI_FORMAT_R16G16B16A16_FLOAT;
           srv_desc.ViewDimension             = D3D11_SRV_DIMENSION_TEXTURE2D;
           srv_desc.Texture2D.MipLevels       = -1;
         }
@@ -1015,7 +1036,7 @@ r_window_end_frame(OS_Handle window, R_Handle window_equip)
       char buffer[256] = {0};
       raddbg_snprintf(buffer, sizeof(buffer), "D3D11 present failure (%lx). The process is terminating.", error);
       os_graphical_message(1, str8_lit("Fatal Error"), str8_cstring(buffer));
-      os_exit_process(1);
+      os_abort(1);
     }
     d_ctx->lpVtbl->ClearState(d_ctx);
   }
@@ -1098,29 +1119,14 @@ r_window_submit(OS_Handle window, R_Handle window_equip, R_PassList *passes)
             R_D3D11_Tex2D *texture = r_d3d11_tex2d_from_handle(texture_handle);
             
             // rjf: get texture sample map matrix, based on format
-            Vec4F32 texture_sample_channel_map[] =
-            {
-              {1, 0, 0, 0},
-              {0, 1, 0, 0},
-              {0, 0, 1, 0},
-              {0, 0, 0, 1},
-            };
-            switch(texture->format)
-            {
-              default: break;
-              case R_Tex2DFormat_R8:
-              {
-                MemoryZeroArray(texture_sample_channel_map);
-                texture_sample_channel_map[0] = v4f32(1, 1, 1, 1);
-              }break;
-            }
+            Mat4x4F32 texture_sample_channel_map = r_sample_channel_map_from_tex2dformat(texture->format);
             
             // rjf: upload uniforms
             R_D3D11_Uniforms_Rect uniforms = {0};
             {
               uniforms.viewport_size             = v2f32(resolution.x, resolution.y);
               uniforms.opacity                   = 1-group_params->transparency;
-              MemoryCopyArray(uniforms.texture_sample_channel_map, texture_sample_channel_map);
+              uniforms.texture_sample_channel_map = texture_sample_channel_map;
               uniforms.texture_t2d_size          = v2f32(texture->size.x, texture->size.y);
               uniforms.xform[0] = v4f32(group_params->xform.v[0][0], group_params->xform.v[1][0], group_params->xform.v[2][0], 0);
               uniforms.xform[1] = v4f32(group_params->xform.v[0][1], group_params->xform.v[1][1], group_params->xform.v[2][1], 0);
@@ -1315,6 +1321,36 @@ r_window_submit(OS_Handle window, R_Handle window_equip, R_PassList *passes)
             { sizeof(R_D3D11_Uniforms_BlurPass) / 16, sizeof(uniforms.kernel) / 16 },
             { sizeof(R_D3D11_Uniforms_BlurPass) / 16, sizeof(uniforms.kernel) / 16 },
           };
+          
+          // rjf: setup scissor rect
+          {
+            Rng2F32 clip = params->clip;
+            D3D11_RECT rect = {0};
+            {
+              if(clip.x0 == 0 && clip.y0 == 0 && clip.x1 == 0 && clip.y1 == 0)
+              {
+                rect.left = 0;
+                rect.right = (LONG)wnd->last_resolution.x;
+                rect.top = 0;
+                rect.bottom = (LONG)wnd->last_resolution.y;
+              }
+              else if(clip.x0 > clip.x1 || clip.y0 > clip.y1)
+              {
+                rect.left = 0;
+                rect.right = 0;
+                rect.top = 0;
+                rect.bottom = 0;
+              }
+              else
+              {
+                rect.left = (LONG)clip.x0;
+                rect.right = (LONG)clip.x1;
+                rect.top = (LONG)clip.y0;
+                rect.bottom = (LONG)clip.y1;
+              }
+            }
+            d_ctx->lpVtbl->RSSetScissorRects(d_ctx, 1, &rect);
+          }
           
           // rjf: for unsetting srv
           ID3D11ShaderResourceView* srv = 0;

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 ////////////////////////////////
@@ -142,7 +142,7 @@ mg_escaped_from_str8(Arena *arena, String8 string)
       String8 str = str8_substr(string, r1u64(start, idx));
       if(str.size != 0)
       {
-        str8_list_push(arena, &strs, str);
+        str8_list_push(scratch.arena, &strs, str);
       }
       start = idx+1;
     }
@@ -517,7 +517,7 @@ mg_child_array_from_node(Arena *arena, MD_Node *node)
 {
   MG_NodeArray children = mg_node_array_make(arena, md_child_count_from_node(node));
   U64 idx = 0;
-  for(MD_EachNode(child, node->first))
+  for MD_EachNode(child, node->first)
   {
     children.v[idx] = child;
     idx += 1;
@@ -533,7 +533,7 @@ mg_node_grid_make_from_node(Arena *arena, MD_Node *root)
   // rjf: determine dimensions
   U64 row_count = md_child_count_from_node(root);
   U64 column_count = 0;
-  for(MD_EachNode(row, root->first))
+  for MD_EachNode(row, root->first)
   {
     U64 cell_count_this_row = md_child_count_from_node(row);
     column_count = Max(column_count, cell_count_this_row);
@@ -548,11 +548,11 @@ mg_node_grid_make_from_node(Arena *arena, MD_Node *root)
   // rjf: fill nodes
   {
     U64 y = 0;
-    for(MD_EachNode(row, root->first))
+    for MD_EachNode(row, root->first)
     {
       U64 x = 0;
       grid.row_parents.v[y] = row;
-      for(MD_EachNode(cell, row->first))
+      for MD_EachNode(cell, row->first)
       {
         grid.cells.v[x*grid.x_stride + y*grid.y_stride] = cell;
         x += 1;
@@ -622,7 +622,7 @@ mg_column_desc_array_from_tag(Arena *arena, MD_Node *tag)
   result.count = md_child_count_from_node(tag);
   result.v = push_array(arena, MG_ColumnDesc, result.count);
   U64 idx = 0;
-  for(MD_EachNode(hdr, tag->first))
+  for MD_EachNode(hdr, tag->first)
   {
     result.v[idx].name = push_str8_copy(arena, hdr->string);
     result.v[idx].kind = MG_ColumnKind_DirectCell;
@@ -901,6 +901,13 @@ mg_eval_table_expand_expr__string(Arena *arena, MG_StrExpr *expr, MG_TableExpand
       
       // rjf: push lookup string
       {
+        B32 is_multiline = (str8_find_needle(lookup_string, 0, str8_lit("\n"), 0) < lookup_string.size);
+        if(is_multiline)
+        {
+          lookup_string = indented_from_string(mg_arena, lookup_string);
+          lookup_string = escaped_from_raw_str8(mg_arena, lookup_string);
+          lookup_string = escaped_from_raw_str8(mg_arena, lookup_string);
+        }
         str8_list_push(arena, out, lookup_string);
       }
     }break;
@@ -1013,6 +1020,7 @@ mg_loop_table_column_expansion(Arena *arena, String8 strexpr, MG_TableExpandInfo
       String8 expansion_str = str8_list_join(arena, &expansion_strs, 0);
       if(expansion_str.size != 0)
       {
+        expansion_str = raw_from_escaped_str8(mg_arena, expansion_str);
         str8_list_push(arena, out, expansion_str);
       }
     }
@@ -1028,15 +1036,15 @@ mg_string_list_from_table_gen(Arena *arena, MG_Map grid_name_map, MG_Map grid_co
   Temp scratch = scratch_begin(&arena, 1);
   if(md_node_is_nil(gen->first) && gen->string.size != 0)
   {
-    str8_list_push(arena, &result, gen->string);
+    str8_list_push(arena, &result, raw_from_escaped_str8(arena, gen->string));
     str8_list_push(arena, &result, str8_lit("\n"));
   }
-  else for(MD_EachNode(strexpr_node, gen->first))
+  else for MD_EachNode(strexpr_node, gen->first)
   {
     // rjf: build task list
     MG_TableExpandTask *first_task = 0;
     MG_TableExpandTask *last_task = 0;
-    for(MD_EachNode(tag, strexpr_node->first_tag))
+    for MD_EachNode(tag, strexpr_node->first_tag)
     {
       if(str8_match(tag->string, str8_lit("expand"), 0))
       {
@@ -1080,7 +1088,7 @@ mg_string_list_from_table_gen(Arena *arena, MG_Map grid_name_map, MG_Map grid_co
       }
       else
       {
-        str8_list_push(arena, &result, strexpr_node->string);
+        str8_list_push(arena, &result, raw_from_escaped_str8(arena, strexpr_node->string));
       }
     }
   }

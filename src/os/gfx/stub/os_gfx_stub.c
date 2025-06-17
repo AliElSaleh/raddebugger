@@ -2,8 +2,18 @@
 //~ rjf: @os_hooks Main Initialization API (Implemented Per-OS)
 
 internal void
-os_graphical_init(void)
+os_gfx_init(void)
 {
+}
+
+////////////////////////////////
+//~ rjf: @os_hooks Graphics System Info (Implemented Per-OS)
+
+internal OS_GfxInfo *
+os_get_gfx_info(void)
+{
+  local_persist OS_GfxInfo g = {0};
+  return &g;
 }
 
 ////////////////////////////////
@@ -24,7 +34,7 @@ os_get_clipboard_text(Arena *arena)
 //~ rjf: @os_hooks Windows (Implemented Per-OS)
 
 internal OS_Handle
-os_window_open(Vec2F32 resolution, OS_WindowFlags flags, String8 title)
+os_window_open(Rng2F32 rect, OS_WindowFlags flags, String8 title)
 {
   OS_Handle handle = {1};
   return handle;
@@ -36,12 +46,12 @@ os_window_close(OS_Handle window)
 }
 
 internal void
-os_window_first_paint(OS_Handle window)
+os_window_set_title(OS_Handle window, String8 title)
 {
 }
 
 internal void
-os_window_equip_repaint(OS_Handle window, OS_WindowRepaintFunctionType *repaint, void *user_data)
+os_window_first_paint(OS_Handle window)
 {
 }
 
@@ -78,8 +88,14 @@ os_window_set_maximized(OS_Handle window, B32 maximized)
 {
 }
 
+internal B32
+os_window_is_minimized(OS_Handle window)
+{
+  return 0;
+}
+
 internal void
-os_window_minimize(OS_Handle window)
+os_window_set_minimized(OS_Handle window, B32 minimized)
 {
 }
 
@@ -170,6 +186,12 @@ os_dim_from_monitor(OS_Handle monitor)
   return v;
 }
 
+internal F32
+os_dpi_from_monitor(OS_Handle monitor)
+{
+  return 96.f;
+}
+
 ////////////////////////////////
 //~ rjf: @os_hooks Events (Implemented Per-OS)
 
@@ -185,10 +207,10 @@ os_get_events(Arena *arena, B32 wait)
   return evts;
 }
 
-internal OS_EventFlags
-os_get_event_flags(void)
+internal OS_Modifiers
+os_get_modifiers(void)
 {
-  OS_EventFlags f = 0;
+  OS_Modifiers f = 0;
   return f;
 }
 
@@ -213,36 +235,28 @@ os_set_cursor(OS_Cursor cursor)
 }
 
 ////////////////////////////////
-//~ rjf: @os_hooks System Properties (Implemented Per-OS)
-
-internal F32
-os_double_click_time(void)
-{
-  return 1.f;
-}
-
-internal F32
-os_caret_blink_time(void)
-{
-  return 1.f;
-}
-
-internal F32
-os_default_refresh_rate(void)
-{
-  return 60.f;
-}
-
-internal B32
-os_granular_sleep_enabled(void)
-{
-  return 1;
-}
-
-////////////////////////////////
-//~ rjf: @os_hooks Native Messages & Panics (Implemented Per-OS)
+//~ rjf: @os_hooks Native User-Facing Graphical Messages (Implemented Per-OS)
 
 internal void
 os_graphical_message(B32 error, String8 title, String8 message)
+{
+}
+
+internal String8
+os_graphical_pick_file(Arena *arena, String8 initial_path)
+{
+  return str8_zero();
+}
+
+////////////////////////////////
+//~ rjf: @os_hooks Shell Operations
+
+internal void
+os_show_in_filesystem_ui(String8 path)
+{
+}
+
+internal void
+os_open_in_browser(String8 url)
 {
 }

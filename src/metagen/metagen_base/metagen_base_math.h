@@ -329,6 +329,28 @@ union Rng2S64
 ////////////////////////////////
 //~ rjf: List Types
 
+typedef struct Rng1U64Node Rng1U64Node;
+struct Rng1U64Node
+{
+  Rng1U64Node *next;
+  Rng1U64 v;
+};
+
+typedef struct Rng1U64List Rng1U64List;
+struct Rng1U64List
+{
+  U64 count;
+  Rng1U64Node *first;
+  Rng1U64Node *last;
+};
+
+typedef struct Rng1U64Array Rng1U64Array;
+struct Rng1U64Array
+{
+  Rng1U64 *v;
+  U64 count;
+};
+
 typedef struct Rng1S64Node Rng1S64Node;
 struct Rng1S64Node
 {
@@ -507,6 +529,7 @@ internal Vec4S32 mix_4s32(Vec4S32 a, Vec4S32 b, F32 t);
 
 internal Mat3x3F32 mat_3x3f32(F32 diagonal);
 internal Mat3x3F32 make_translate_3x3f32(Vec2F32 delta);
+internal Mat3x3F32 make_scale_3x3f32(Vec2F32 scale);
 internal Mat3x3F32 mul_3x3f32(Mat3x3F32 a, Mat3x3F32 b);
 
 internal Mat4x4F32 mat_4x4f32(F32 diagonal);
@@ -641,6 +664,10 @@ internal U32 u32_from_rgba(Vec4F32 rgba);
 
 ////////////////////////////////
 //~ rjf: List Type Functions
+
+internal void rng1u64_list_push(Arena *arena, Rng1U64List *list, Rng1U64 rng);
+internal void rng1u64_list_concat(Rng1U64List *list, Rng1U64List *to_concat);
+internal Rng1U64Array rng1u64_array_from_list(Arena *arena, Rng1U64List *list);
 
 internal void rng1s64_list_push(Arena *arena, Rng1S64List *list, Rng1S64 rng);
 internal Rng1S64Array rng1s64_array_from_list(Arena *arena, Rng1S64List *list);

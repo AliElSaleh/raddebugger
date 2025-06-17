@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 ////////////////////////////////
@@ -37,18 +37,6 @@ os_handle_array_from_list(Arena *arena, OS_HandleList *list)
   {
     result.v[idx] = n->v;
   }
-  return result;
-}
-
-////////////////////////////////
-//~ rjf: System Path Helper (Helper, Implemented Once)
-
-internal String8
-os_string_from_system_path(Arena *arena, OS_SystemPath path)
-{
-  String8List strs = {0};
-  os_string_list_from_system_path(arena, path, &strs);
-  String8 result = str8_list_first(&strs);
   return result;
 }
 
@@ -102,13 +90,40 @@ os_write_data_list_to_file_path(String8 path, String8List list)
   if(!os_handle_match(file, os_handle_zero()))
   {
     good = 1;
-    U64 off = 0;
-    for(String8Node *n = list.first; n != 0; n = n->next)
+    Temp scratch = scratch_begin(0, 0);
+    U64 write_buffer_size = KB(64);
+    U8 *write_buffer = push_array_no_zero(scratch.arena, U8, write_buffer_size);
+    U64 write_buffer_write_pos = 0;
+    U64 write_buffer_read_pos = 0;
+    U64 file_off = 0;
     {
-      os_file_write(file, r1u64(off, off+n->string.size), n->string.str);
-      off += n->string.size;
+      for(String8Node *n = list.first; n != 0; n = n->next)
+      {
+        for(U64 n_off = 0; n_off < n->string.size;)
+        {
+          U64 write_buffer_unconsumed_size = (write_buffer_write_pos - write_buffer_read_pos);
+          U64 write_buffer_available_size = (write_buffer_size - write_buffer_unconsumed_size);
+          if(write_buffer_available_size == 0)
+          {
+            os_file_write(file, r1u64(file_off, file_off+write_buffer_size), write_buffer);
+            file_off += write_buffer_size;
+            write_buffer_read_pos += write_buffer_size;
+          }
+          else
+          {
+            U64 bytes_to_copy = Min(write_buffer_available_size, n->string.size - n_off);
+            write_buffer_write_pos += ring_write(write_buffer, write_buffer_size, write_buffer_write_pos, n->string.str + n_off, bytes_to_copy);
+            n_off += bytes_to_copy;
+          }
+        }
+      }
+      if(write_buffer_write_pos > write_buffer_read_pos)
+      {
+        os_file_write(file, r1u64(file_off, file_off + (write_buffer_write_pos-write_buffer_read_pos)), write_buffer);
+      }
     }
     os_file_close(file);
+    scratch_end(scratch);
   }
   return good;
 }
@@ -163,81 +178,111 @@ os_string_from_file_range(Arena *arena, OS_Handle file, Rng1U64 range)
   return result;
 }
 
-////////////////////////////////
-//~ rjf: Synchronization Primitive Helpers (Helpers, Implemented Once)
-
-internal void
-os_mutex_take(OS_Handle mutex){
-  os_mutex_take_(mutex);
-}
-
-internal void
-os_mutex_drop(OS_Handle mutex){
-  os_mutex_drop_(mutex);
-}
-
-internal void
-os_rw_mutex_take_r(OS_Handle rw_mutex){
-  os_rw_mutex_take_r_(rw_mutex);
-}
-
-internal void
-os_rw_mutex_drop_r(OS_Handle rw_mutex){
-  os_rw_mutex_drop_r_(rw_mutex);
-}
-
-internal void
-os_rw_mutex_take_w(OS_Handle rw_mutex){
-  os_rw_mutex_take_w_(rw_mutex);
-}
-
-internal void
-os_rw_mutex_drop_w(OS_Handle rw_mutex){
-  os_rw_mutex_drop_w_(rw_mutex);
-}
-
-internal B32
-os_condition_variable_wait(OS_Handle cv, OS_Handle mutex, U64 endt_us){
-  B32 result = os_condition_variable_wait_(cv, mutex, endt_us);
-  return(result);
-}
-
-internal B32
-os_condition_variable_wait_rw_r(OS_Handle cv, OS_Handle mutex_rw, U64 endt_us){
-  B32 result = os_condition_variable_wait_rw_r_(cv, mutex_rw, endt_us);
-  return(result);
-}
-
-internal B32
-os_condition_variable_wait_rw_w(OS_Handle cv, OS_Handle mutex_rw, U64 endt_us){
-  B32 result = os_condition_variable_wait_rw_w_(cv, mutex_rw, endt_us);
-  return(result);
-}
-
-internal void
-os_condition_variable_signal(OS_Handle cv){
-  os_condition_variable_signal_(cv);
-}
-
-internal void
-os_condition_variable_broadcast(OS_Handle cv){
-  os_condition_variable_broadcast_(cv);
-}
-
 internal String8
-os_string_from_guid(Arena *arena, OS_Guid guid)
+os_file_read_cstring(Arena *arena, OS_Handle file, U64 off)
 {
-  String8 result = push_str8f(arena, "%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-                              guid.data1,
-                              guid.data2,
-                              guid.data3,
-                              guid.data4[0],
-                              guid.data4[1],
-                              guid.data4[2],
-                              guid.data4[3],
-                              guid.data4[4],
-                              guid.data4[5],
-                              guid.data4[6],
-                              guid.data4[7]);
+  Temp scratch = scratch_begin(&arena, 1);
+  String8List block_list = {0};
+  for(U64 cursor = off, stride = 256;; cursor += stride)
+  {
+    U8      *raw_block = push_array_no_zero(scratch.arena, U8, stride);
+    U64      read_size = os_file_read(file, r1u64(cursor, cursor + stride), raw_block);
+    String8  block     = str8_cstring_capped(raw_block, raw_block+read_size);
+    str8_list_push(scratch.arena, &block_list, block);
+    if(read_size != stride || (block.size+1 <= read_size && block.str[block.size] == 0))
+    {
+      break;
+    }
+  }
+  String8 result = str8_list_join(arena, &block_list, 0);
+  scratch_end(scratch);
   return result;
 }
+
+////////////////////////////////
+//~ rjf: Process Launcher Helpers
+
+internal OS_Handle
+os_cmd_line_launch(String8 string)
+{
+  Temp scratch = scratch_begin(0, 0);
+  U8 split_chars[] = {' '};
+  String8List parts = str8_split(scratch.arena, string, split_chars, ArrayCount(split_chars), 0);
+  OS_Handle handle = {0};
+  if(parts.node_count != 0)
+  {
+    // rjf: unpack exe part
+    String8 exe = parts.first->string;
+    String8 exe_folder = str8_chop_last_slash(exe);
+    if(exe_folder.size == 0)
+    {
+      exe_folder = os_get_current_path(scratch.arena);
+    }
+    
+    // rjf: find stdout delimiter
+    String8Node *stdout_delimiter_n = 0;
+    for(String8Node *n = parts.first; n != 0; n = n->next)
+    {
+      if(str8_match(n->string, str8_lit(">"), 0))
+      {
+        stdout_delimiter_n = n;
+        break;
+      }
+    }
+    
+    // rjf: read stdout path
+    String8 stdout_path = {0};
+    if(stdout_delimiter_n && stdout_delimiter_n->next)
+    {
+      stdout_path = stdout_delimiter_n->next->string;
+    }
+    
+    // rjf: open stdout handle
+    OS_Handle stdout_handle = {0};
+    if(stdout_path.size != 0)
+    {
+      OS_Handle file = os_file_open(OS_AccessFlag_Write|OS_AccessFlag_Read, stdout_path);
+      os_file_close(file);
+      stdout_handle = os_file_open(OS_AccessFlag_Write|OS_AccessFlag_Append|OS_AccessFlag_ShareRead|OS_AccessFlag_ShareWrite|OS_AccessFlag_Inherited, stdout_path);
+    }
+    
+    // rjf: form command line
+    String8List cmdline = {0};
+    for(String8Node *n = parts.first; n != stdout_delimiter_n && n != 0; n = n->next)
+    {
+      str8_list_push(scratch.arena, &cmdline, n->string);
+    }
+    
+    // rjf: launch
+    OS_ProcessLaunchParams params = {0};
+    params.cmd_line = cmdline;
+    params.path = exe_folder;
+    params.inherit_env = 1;
+    params.stdout_file = stdout_handle;
+    handle = os_process_launch(&params);
+    
+    // rjf: close stdout handle
+    {
+      if(stdout_path.size != 0)
+      {
+        os_file_close(stdout_handle);
+      }
+    }
+  }
+  scratch_end(scratch);
+  return handle;
+}
+
+internal OS_Handle
+os_cmd_line_launchf(char *fmt, ...)
+{
+  Temp scratch = scratch_begin(0, 0);
+  va_list args;
+  va_start(args, fmt);
+  String8 string = push_str8fv(scratch.arena, fmt, args);
+  OS_Handle result = os_cmd_line_launch(string);
+  va_end(args);
+  scratch_end(scratch);
+  return result;
+}
+

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 #ifndef BASE_INC_H
@@ -17,6 +17,7 @@
 #include "base_thread_context.h"
 #include "base_command_line.h"
 #include "base_markup.h"
+#include "base_meta.h"
 #include "base_log.h"
 #include "base_entry_point.h"
 

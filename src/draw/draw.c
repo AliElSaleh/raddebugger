@@ -1,27 +1,27 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 ////////////////////////////////
 //~ rjf: Generated Code
 
-#define D_StackPushImpl(name_upper, name_lower, type, val) \
-D_Bucket *bucket = d_top_bucket();\
+#define DR_StackPushImpl(name_upper, name_lower, type, val) \
+DR_Bucket *bucket = dr_top_bucket();\
 type old_val = bucket->top_##name_lower->v;\
-D_##name_upper##Node *node = push_array(d_thread_ctx->arena, D_##name_upper##Node, 1);\
+DR_##name_upper##Node *node = push_array(dr_thread_ctx->arena, DR_##name_upper##Node, 1);\
 node->v = (val);\
 SLLStackPush(bucket->top_##name_lower, node);\
 bucket->stack_gen += 1;\
 return old_val
 
-#define D_StackPopImpl(name_upper, name_lower, type) \
-D_Bucket *bucket = d_top_bucket();\
+#define DR_StackPopImpl(name_upper, name_lower, type) \
+DR_Bucket *bucket = dr_top_bucket();\
 type popped_val = bucket->top_##name_lower->v;\
 SLLStackPop(bucket->top_##name_lower);\
 bucket->stack_gen += 1;\
 return popped_val
 
-#define D_StackTopImpl(name_upper, name_lower, type) \
-D_Bucket *bucket = d_top_bucket();\
+#define DR_StackTopImpl(name_upper, name_lower, type) \
+DR_Bucket *bucket = dr_top_bucket();\
 type top_val = bucket->top_##name_lower->v;\
 return top_val
 
@@ -31,7 +31,7 @@ return top_val
 //~ rjf: Basic Helpers
 
 internal U64
-d_hash_from_string(String8 string)
+dr_hash_from_string(String8 string)
 {
   U64 result = 5381;
   for(U64 i = 0; i < string.size; i += 1)
@@ -45,9 +45,9 @@ d_hash_from_string(String8 string)
 //~ rjf: Fancy String Type Functions
 
 internal void
-d_fancy_string_list_push(Arena *arena, D_FancyStringList *list, D_FancyString *str)
+dr_fstrs_push(Arena *arena, DR_FStrList *list, DR_FStr *str)
 {
-  D_FancyStringNode *n = push_array_no_zero(arena, D_FancyStringNode, 1);
+  DR_FStrNode *n = push_array_no_zero(arena, DR_FStrNode, 1);
   MemoryCopyStruct(&n->v, str);
   SLLQueuePush(list->first, list->last, n);
   list->node_count += 1;
@@ -55,7 +55,38 @@ d_fancy_string_list_push(Arena *arena, D_FancyStringList *list, D_FancyString *s
 }
 
 internal void
-d_fancy_string_list_concat_in_place(D_FancyStringList *dst, D_FancyStringList *to_push)
+dr_fstrs_push_new_(Arena *arena, DR_FStrList *list, DR_FStrParams *params, DR_FStrParams *overrides, String8 string)
+{
+  DR_FStr fstr = {string, *params};
+  if(!fnt_tag_match(fnt_tag_zero(), overrides->font))
+  {
+    fstr.params.font = overrides->font;
+  }
+  if(overrides->raster_flags != 0)
+  {
+    fstr.params.raster_flags = overrides->raster_flags;
+  }
+  if(overrides->color.x != 0 || overrides->color.y != 0 || overrides->color.z != 0 || overrides->color.w != 0)
+  {
+    fstr.params.color = overrides->color;
+  }
+  if(overrides->size != 0)
+  {
+    fstr.params.size = overrides->size;
+  }
+  if(overrides->underline_thickness != 0)
+  {
+    fstr.params.underline_thickness = overrides->underline_thickness;
+  }
+  if(overrides->strikethrough_thickness != 0)
+  {
+    fstr.params.strikethrough_thickness = overrides->strikethrough_thickness;
+  }
+  dr_fstrs_push(arena, list, &fstr);
+}
+
+internal void
+dr_fstrs_concat_in_place(DR_FStrList *dst, DR_FStrList *to_push)
 {
   if(dst->last != 0 && to_push->first != 0)
   {
@@ -71,34 +102,80 @@ d_fancy_string_list_concat_in_place(D_FancyStringList *dst, D_FancyStringList *t
   MemoryZeroStruct(to_push);
 }
 
+internal DR_FStrList
+dr_fstrs_copy(Arena *arena, DR_FStrList *src)
+{
+  DR_FStrList dst = {0};
+  for(DR_FStrNode *src_n = src->first; src_n != 0; src_n = src_n->next)
+  {
+    DR_FStr fstr = src_n->v;
+    fstr.string = push_str8_copy(arena, fstr.string);
+    dr_fstrs_push(arena, &dst, &fstr);
+  }
+  return dst;
+}
+
 internal String8
-d_string_from_fancy_string_list(Arena *arena, D_FancyStringList *list)
+dr_string_from_fstrs(Arena *arena, DR_FStrList *list)
 {
   String8 result = {0};
-  result.size = list->total_size;
-  result.str = push_array_no_zero(arena, U8, result.size);
-  U64 idx = 0;
-  for(D_FancyStringNode *n = list->first; n != 0; n = n->next)
   {
-    MemoryCopy(result.str+idx, n->v.string.str, n->v.string.size);
-    idx += n->v.string.size;
+    Temp scratch = scratch_begin(&arena, 1);
+    String8List parts = {0};
+    for(DR_FStrNode *n = list->first; n != 0; n = n->next)
+    {
+      if(!fnt_tag_match(n->v.params.font, dr_thread_ctx->icon_font))
+      {
+        str8_list_push(scratch.arena, &parts, n->v.string);
+      }
+    }
+    result = str8_list_join(arena, &parts, 0);
+    result = str8_skip_chop_whitespace(result);
+    scratch_end(scratch);
   }
   return result;
 }
 
-internal D_FancyRunList
-d_fancy_run_list_from_fancy_string_list(Arena *arena, F32 tab_size_px, D_FancyStringList *strs)
+internal FuzzyMatchRangeList
+dr_fuzzy_match_find_from_fstrs(Arena *arena, DR_FStrList *fstrs, String8 needle)
+{
+  Temp scratch = scratch_begin(&arena, 1);
+  String8 fstrs_string = {0};
+  fstrs_string.size = fstrs->total_size;
+  fstrs_string.str = push_array(arena, U8, fstrs_string.size);
+  {
+    // TODO(rjf): the fact that we only increment on non-icon portions is super weird?
+    // we are only doing that because of the rendering of the fuzzy matches, so maybe
+    // once that is straightened out, we can fix the code here too...
+    U64 off = 0;
+    for(DR_FStrNode *n = fstrs->first; n != 0; n = n->next)
+    {
+      if(!fnt_tag_match(n->v.params.font, dr_thread_ctx->icon_font))
+      {
+        MemoryCopy(fstrs_string.str + off, n->v.string.str, n->v.string.size);
+        off += n->v.string.size;
+      }
+    }
+  }
+  FuzzyMatchRangeList ranges = fuzzy_match_find(arena, needle, fstrs_string);
+  scratch_end(scratch);
+  return ranges;
+}
+
+internal DR_FRunList
+dr_fruns_from_fstrs(Arena *arena, F32 tab_size_px, DR_FStrList *strs)
 {
   ProfBeginFunction();
-  D_FancyRunList run_list = {0};
+  DR_FRunList run_list = {0};
   F32 base_align_px = 0;
-  for(D_FancyStringNode *n = strs->first; n != 0; n = n->next)
+  for(DR_FStrNode *n = strs->first; n != 0; n = n->next)
   {
-    D_FancyRunNode *dst_n = push_array(arena, D_FancyRunNode, 1);
-    dst_n->v.run = f_push_run_from_string(arena, n->v.font, n->v.size, base_align_px, tab_size_px, 0, n->v.string);
-    dst_n->v.color = n->v.color;
-    dst_n->v.underline_thickness = n->v.underline_thickness;
-    dst_n->v.strikethrough_thickness = n->v.strikethrough_thickness;
+    DR_FRunNode *dst_n = push_array(arena, DR_FRunNode, 1);
+    dst_n->v.run = fnt_run_from_string(n->v.params.font, n->v.params.size, base_align_px, tab_size_px, n->v.params.raster_flags, n->v.string);
+    dst_n->v.color = n->v.params.color;
+    dst_n->v.underline_thickness = n->v.params.underline_thickness;
+    dst_n->v.strikethrough_thickness = n->v.params.strikethrough_thickness;
+    dst_n->v.icon = (fnt_tag_match(n->v.params.font, dr_thread_ctx->icon_font));
     SLLQueuePush(run_list.first, run_list.last, dst_n);
     run_list.node_count += 1;
     run_list.dim.x += dst_n->v.run.dim.x;
@@ -109,20 +186,14 @@ d_fancy_run_list_from_fancy_string_list(Arena *arena, F32 tab_size_px, D_FancySt
   return run_list;
 }
 
-internal D_FancyRunList
-d_fancy_run_list_copy(Arena *arena, D_FancyRunList *src)
+internal Vec2F32
+dr_dim_from_fstrs(F32 tab_size_px, DR_FStrList *fstrs)
 {
-  D_FancyRunList dst = {0};
-  for(D_FancyRunNode *src_n = src->first; src_n != 0; src_n = src_n->next)
-  {
-    D_FancyRunNode *dst_n = push_array(arena, D_FancyRunNode, 1);
-    SLLQueuePush(dst.first, dst.last, dst_n);
-    MemoryCopyStruct(&dst_n->v, &src_n->v);
-    dst_n->v.run.pieces = f_piece_array_copy(arena, &src_n->v.run.pieces);
-    dst.node_count += 1;
-  }
-  dst.dim = src->dim;
-  return dst;
+  Temp scratch = scratch_begin(0, 0);
+  DR_FRunList fruns = dr_fruns_from_fstrs(scratch.arena, tab_size_px, fstrs);
+  Vec2F32 dim = fruns.dim;
+  scratch_end(scratch);
+  return dim;
 }
 
 ////////////////////////////////
@@ -131,22 +202,23 @@ d_fancy_run_list_copy(Arena *arena, D_FancyRunList *src)
 // (Frame boundaries)
 
 internal void
-d_begin_frame(void)
+dr_begin_frame(FNT_Tag icon_font)
 {
-  if(d_thread_ctx == 0)
+  if(dr_thread_ctx == 0)
   {
-    Arena *arena = arena_alloc__sized(GB(64), MB(8));
-    d_thread_ctx = push_array(arena, D_ThreadCtx, 1);
-    d_thread_ctx->arena = arena;
-    d_thread_ctx->arena_frame_start_pos = arena_pos(arena);
+    Arena *arena = arena_alloc(.reserve_size = GB(64), .commit_size = MB(8));
+    dr_thread_ctx = push_array(arena, DR_ThreadCtx, 1);
+    dr_thread_ctx->arena = arena;
+    dr_thread_ctx->arena_frame_start_pos = arena_pos(arena);
   }
-  arena_pop_to(d_thread_ctx->arena, d_thread_ctx->arena_frame_start_pos);
-  d_thread_ctx->free_bucket_selection = 0;
-  d_thread_ctx->top_bucket = 0;
+  arena_pop_to(dr_thread_ctx->arena, dr_thread_ctx->arena_frame_start_pos);
+  dr_thread_ctx->free_bucket_selection = 0;
+  dr_thread_ctx->top_bucket = 0;
+  dr_thread_ctx->icon_font = icon_font;
 }
 
 internal void
-d_submit_bucket(OS_Handle os_window, R_Handle r_window, D_Bucket *bucket)
+dr_submit_bucket(OS_Handle os_window, R_Handle r_window, DR_Bucket *bucket)
 {
   r_window_submit(os_window, r_window, &bucket->passes);
 }
@@ -156,45 +228,45 @@ d_submit_bucket(OS_Handle os_window, R_Handle r_window, D_Bucket *bucket)
 //
 // (Bucket: Handle to sequence of many render passes, constructed by this layer)
 
-internal D_Bucket *
-d_bucket_make(void)
+internal DR_Bucket *
+dr_bucket_make(void)
 {
-  D_Bucket *bucket = push_array(d_thread_ctx->arena, D_Bucket, 1);
-  D_BucketStackInits(bucket);
+  DR_Bucket *bucket = push_array(dr_thread_ctx->arena, DR_Bucket, 1);
+  DR_BucketStackInits(bucket);
   return bucket;
 }
 
 internal void
-d_push_bucket(D_Bucket *bucket)
+dr_push_bucket(DR_Bucket *bucket)
 {
-  D_BucketSelectionNode *node = d_thread_ctx->free_bucket_selection;
+  DR_BucketSelectionNode *node = dr_thread_ctx->free_bucket_selection;
   if(node)
   {
-    SLLStackPop(d_thread_ctx->free_bucket_selection);
+    SLLStackPop(dr_thread_ctx->free_bucket_selection);
   }
   else
   {
-    node = push_array(d_thread_ctx->arena, D_BucketSelectionNode, 1);
+    node = push_array(dr_thread_ctx->arena, DR_BucketSelectionNode, 1);
   }
-  SLLStackPush(d_thread_ctx->top_bucket, node);
+  SLLStackPush(dr_thread_ctx->top_bucket, node);
   node->bucket = bucket;
 }
 
 internal void
-d_pop_bucket(void)
+dr_pop_bucket(void)
 {
-  D_BucketSelectionNode *node = d_thread_ctx->top_bucket;
-  SLLStackPop(d_thread_ctx->top_bucket);
-  SLLStackPush(d_thread_ctx->free_bucket_selection, node);
+  DR_BucketSelectionNode *node = dr_thread_ctx->top_bucket;
+  SLLStackPop(dr_thread_ctx->top_bucket);
+  SLLStackPush(dr_thread_ctx->free_bucket_selection, node);
 }
 
-internal D_Bucket *
-d_top_bucket(void)
+internal DR_Bucket *
+dr_top_bucket(void)
 {
-  D_Bucket *bucket = 0;
-  if(d_thread_ctx->top_bucket != 0)
+  DR_Bucket *bucket = 0;
+  if(dr_thread_ctx->top_bucket != 0)
   {
-    bucket = d_thread_ctx->top_bucket->bucket;
+    bucket = dr_thread_ctx->top_bucket->bucket;
   }
   return bucket;
 }
@@ -214,10 +286,10 @@ d_top_bucket(void)
 //- rjf: rectangles
 
 internal inline R_Rect2DInst *
-d_rect(Rng2F32 dst, Vec4F32 color, F32 corner_radius, F32 border_thickness, F32 edge_softness)
+dr_rect(Rng2F32 dst, Vec4F32 color, F32 corner_radius, F32 border_thickness, F32 edge_softness)
 {
-  Arena *arena = d_thread_ctx->arena;
-  D_Bucket *bucket = d_top_bucket();
+  Arena *arena = dr_thread_ctx->arena;
+  DR_Bucket *bucket = dr_top_bucket();
   R_Pass *pass = r_pass_from_kind(arena, &bucket->passes, R_PassKind_UI);
   R_PassParams_UI *params = pass->params_ui;
   R_BatchGroup2DList *rects = &params->rects;
@@ -255,10 +327,10 @@ d_rect(Rng2F32 dst, Vec4F32 color, F32 corner_radius, F32 border_thickness, F32 
 //- rjf: images
 
 internal inline R_Rect2DInst *
-d_img(Rng2F32 dst, Rng2F32 src, R_Handle texture, Vec4F32 color, F32 corner_radius, F32 border_thickness, F32 edge_softness)
+dr_img(Rng2F32 dst, Rng2F32 src, R_Handle texture, Vec4F32 color, F32 corner_radius, F32 border_thickness, F32 edge_softness)
 {
-  Arena *arena = d_thread_ctx->arena;
-  D_Bucket *bucket = d_top_bucket();
+  Arena *arena = dr_thread_ctx->arena;
+  DR_Bucket *bucket = dr_top_bucket();
   R_Pass *pass = r_pass_from_kind(arena, &bucket->passes, R_PassKind_UI);
   R_PassParams_UI *params = pass->params_ui;
   R_BatchGroup2DList *rects = &params->rects;
@@ -300,13 +372,14 @@ d_img(Rng2F32 dst, Rng2F32 src, R_Handle texture, Vec4F32 color, F32 corner_radi
 //- rjf: blurs
 
 internal R_PassParams_Blur *
-d_blur(Rng2F32 rect, F32 blur_size, F32 corner_radius)
+dr_blur(Rng2F32 rect, F32 blur_size, F32 corner_radius)
 {
-  Arena *arena = d_thread_ctx->arena;
-  D_Bucket *bucket = d_top_bucket();
+  Arena *arena = dr_thread_ctx->arena;
+  DR_Bucket *bucket = dr_top_bucket();
   R_Pass *pass = r_pass_from_kind(arena, &bucket->passes, R_PassKind_Blur);
   R_PassParams_Blur *params = pass->params_blur;
   params->rect = rect;
+  params->clip = dr_top_clip();
   params->blur_size = blur_size;
   params->corner_radii[Corner_00] = corner_radius;
   params->corner_radii[Corner_01] = corner_radius;
@@ -318,10 +391,10 @@ d_blur(Rng2F32 rect, F32 blur_size, F32 corner_radius)
 //- rjf: 3d rendering pass params
 
 internal R_PassParams_Geo3D *
-d_geo3d_begin(Rng2F32 viewport, Mat4x4F32 view, Mat4x4F32 projection)
+dr_geo3d_begin(Rng2F32 viewport, Mat4x4F32 view, Mat4x4F32 projection)
 {
-  Arena *arena = d_thread_ctx->arena;
-  D_Bucket *bucket = d_top_bucket();
+  Arena *arena = dr_thread_ctx->arena;
+  DR_Bucket *bucket = dr_top_bucket();
   R_Pass *pass = r_pass_from_kind(arena, &bucket->passes, R_PassKind_Geo3D);
   R_PassParams_Geo3D *params = pass->params_geo3d;
   params->viewport = viewport;
@@ -333,10 +406,10 @@ d_geo3d_begin(Rng2F32 viewport, Mat4x4F32 view, Mat4x4F32 projection)
 //- rjf: meshes
 
 internal R_Mesh3DInst *
-d_mesh(R_Handle mesh_vertices, R_Handle mesh_indices, R_GeoTopologyKind mesh_geo_topology, R_GeoVertexFlags mesh_geo_vertex_flags, R_Handle albedo_tex, Mat4x4F32 inst_xform)
+dr_mesh(R_Handle mesh_vertices, R_Handle mesh_indices, R_GeoTopologyKind mesh_geo_topology, R_GeoVertexFlags mesh_geo_vertex_flags, R_Handle albedo_tex, Mat4x4F32 inst_xform)
 {
-  Arena *arena = d_thread_ctx->arena;
-  D_Bucket *bucket = d_top_bucket();
+  Arena *arena = dr_thread_ctx->arena;
+  DR_Bucket *bucket = dr_top_bucket();
   R_Pass *pass = r_pass_from_kind(arena, &bucket->passes, R_PassKind_Geo3D);
   R_PassParams_Geo3D *params = pass->params_geo3d;
   
@@ -361,9 +434,9 @@ d_mesh(R_Handle mesh_vertices, R_Handle mesh_indices, R_GeoTopologyKind mesh_geo
       (U64)mesh_geo_vertex_flags,
       albedo_tex.u64[0],
       albedo_tex.u64[1],
-      (U64)d_top_tex2d_sample_kind(),
+      (U64)dr_top_tex2d_sample_kind(),
     };
-    hash = d_hash_from_string(str8((U8 *)buffer, sizeof(buffer)));
+    hash = dr_hash_from_string(str8((U8 *)buffer, sizeof(buffer)));
     slot_idx = hash%params->mesh_batches.slots_count;
   }
   
@@ -392,7 +465,7 @@ d_mesh(R_Handle mesh_vertices, R_Handle mesh_indices, R_GeoTopologyKind mesh_geo
     node->params.mesh_geo_topology = mesh_geo_topology;
     node->params.mesh_geo_vertex_flags = mesh_geo_vertex_flags;
     node->params.albedo_tex = albedo_tex;
-    node->params.albedo_tex_sample_kind = d_top_tex2d_sample_kind();
+    node->params.albedo_tex_sample_kind = dr_top_tex2d_sample_kind();
     node->params.xform = mat_4x4f32(1.f);
   }
   
@@ -405,12 +478,12 @@ d_mesh(R_Handle mesh_vertices, R_Handle mesh_indices, R_GeoTopologyKind mesh_geo
 //- rjf: collating one pre-prepped bucket into parent bucket
 
 internal void
-d_sub_bucket(D_Bucket *bucket)
+dr_sub_bucket(DR_Bucket *bucket)
 {
-  Arena *arena = d_thread_ctx->arena;
-  D_Bucket *src = bucket;
-  D_Bucket *dst = d_top_bucket();
-  Rng2F32 dst_clip = d_top_clip();
+  Arena *arena = dr_thread_ctx->arena;
+  DR_Bucket *src = bucket;
+  DR_Bucket *dst = dr_top_bucket();
+  Rng2F32 dst_clip = dr_top_clip();
   B32 dst_clip_is_set = !(dst_clip.x0 == 0 && dst_clip.x1 == 0 &&
                           dst_clip.y0 == 0 && dst_clip.y1 == 0);
   for(R_PassNode *n = src->passes.first; n != 0; n = n->next)
@@ -433,7 +506,7 @@ d_sub_bucket(D_Bucket *bucket)
           dst_ui->rects.count += 1;
           MemoryCopyStruct(&dst_group_n->params, &src_group_n->params);
           dst_group_n->batches = src_group_n->batches;
-          dst_group_n->params.xform = d_top_xform2d();
+          dst_group_n->params.xform = dr_top_xform2d();
           if(dst_clip_is_set)
           {
             B32 clip_is_set = !(dst_group_n->params.clip.x0 == 0 &&
@@ -454,35 +527,40 @@ d_sub_bucket(D_Bucket *bucket)
 //- rjf: text
 
 internal void
-d_truncated_fancy_run_list(Vec2F32 p, D_FancyRunList *list, F32 max_x, F_Run trailer_run)
+dr_truncated_fancy_run_list(Vec2F32 p, DR_FRunList *list, F32 max_x, FNT_Run trailer_run)
 {
   ProfBeginFunction();
   
   //- rjf: total advance > max? -> enable trailer
-  B32 trailer_enabled = (list->dim.x >= max_x && trailer_run.dim.x < max_x);
+  B32 trailer_enabled = (list->dim.x > max_x && trailer_run.dim.x < max_x);
   
   //- rjf: draw runs
   F32 advance = 0;
   B32 trailer_found = 0;
   Vec4F32 last_color = {0};
   U64 byte_off = 0;
-  for(D_FancyRunNode *n = list->first; n != 0; n = n->next)
+  for(DR_FRunNode *n = list->first; n != 0; n = n->next)
   {
-    D_FancyRun *fr = &n->v;
-    F_Piece *piece_first = fr->run.pieces.v;
-    F_Piece *piece_opl = piece_first + fr->run.pieces.count;
+    DR_FRun *fr = &n->v;
+    Rng1F32 pixel_range = {0};
+    {
+      pixel_range.min = 100000;
+      pixel_range.max = 0;
+    }
+    FNT_Piece *piece_first = fr->run.pieces.v;
+    FNT_Piece *piece_opl = piece_first + fr->run.pieces.count;
     F32 pre_advance = advance;
     last_color = fr->color;
-    for(F_Piece *piece = piece_first;
+    for(FNT_Piece *piece = piece_first;
         piece < piece_opl;
         piece += 1)
     {
-      if(trailer_enabled && advance + piece->advance >= (max_x - trailer_run.dim.x))
+      if(trailer_enabled && advance + piece->advance > (max_x - trailer_run.dim.x))
       {
         trailer_found = 1;
         break;
       }
-      if(!trailer_enabled && advance + piece->advance >= max_x)
+      if(!trailer_enabled && advance + piece->advance > max_x)
       {
         goto end_draw;
       }
@@ -495,22 +573,24 @@ d_truncated_fancy_run_list(Vec2F32 p, D_FancyRunList *list, F32 max_x, F_Run tra
                            p.y + piece->offset.y + size.y);
       if(!r_handle_match(texture, r_handle_zero()))
       {
-        d_img(dst, src, texture, fr->color, 0, 0, 0);
-        //d_rect(dst, v4f32(1, 0, 0, 1), 0, 1.f, 0.f);
+        dr_img(dst, src, texture, fr->color, 0, 0, 0);
+        // dr_rect(dst, v4f32(0, 1, 0, 0.5f), 0, 1.f, 0.f);
       }
       advance += piece->advance;
+      pixel_range.min = Min(pre_advance, pixel_range.min);
+      pixel_range.max = Max(advance, pixel_range.max);
     }
     if(fr->underline_thickness > 0)
     {
-      d_rect(r2f32p(p.x+pre_advance,
-                    p.y+fr->run.descent+fr->run.descent/8,
-                    p.x+advance + (advance-pre_advance)/8,
-                    p.y+fr->run.descent+fr->run.descent/8+fr->underline_thickness),
-             fr->color, 0, 0, 1.f);
+      dr_rect(r2f32p(p.x + pixel_range.min,
+                     p.y+fr->run.descent+fr->run.descent/8,
+                     p.x + pixel_range.max,
+                     p.y+fr->run.descent+fr->run.descent/8+fr->underline_thickness),
+              fr->color, 0, 0, 0.8f);
     }
     if(fr->strikethrough_thickness > 0)
     {
-      d_rect(r2f32p(p.x+pre_advance, p.y+fr->run.descent - fr->run.ascent/2, p.x+advance, p.y+fr->run.descent - fr->run.ascent/2 + fr->strikethrough_thickness), fr->color, 0, 0, 1.f);
+      dr_rect(r2f32p(p.x+pre_advance, p.y+fr->run.descent - fr->run.ascent/2, p.x+advance, p.y+fr->run.descent - fr->run.ascent/2 + fr->strikethrough_thickness), fr->color, 0, 0, 1.f);
     }
     if(trailer_found)
     {
@@ -522,11 +602,11 @@ d_truncated_fancy_run_list(Vec2F32 p, D_FancyRunList *list, F32 max_x, F_Run tra
   //- rjf: draw trailer
   if(trailer_found)
   {
-    F_Piece *piece_first = trailer_run.pieces.v;
-    F_Piece *piece_opl = piece_first + trailer_run.pieces.count;
+    FNT_Piece *piece_first = trailer_run.pieces.v;
+    FNT_Piece *piece_opl = piece_first + trailer_run.pieces.count;
     F32 pre_advance = advance;
     Vec4F32 trailer_piece_color = last_color;
-    for(F_Piece *piece = piece_first;
+    for(FNT_Piece *piece = piece_first;
         piece < piece_opl;
         piece += 1)
     {
@@ -539,7 +619,7 @@ d_truncated_fancy_run_list(Vec2F32 p, D_FancyRunList *list, F32 max_x, F_Run tra
                            p.y + piece->offset.y + size.y);
       if(!r_handle_match(texture, r_handle_zero()))
       {
-        d_img(dst, src, texture, trailer_piece_color, 0, 0, 0);
+        dr_img(dst, src, texture, trailer_piece_color, 0, 0, 0);
         trailer_piece_color.w *= 0.5f;
       }
       advance += piece->advance;
@@ -550,7 +630,7 @@ d_truncated_fancy_run_list(Vec2F32 p, D_FancyRunList *list, F32 max_x, F_Run tra
 }
 
 internal void
-d_truncated_fancy_run_fuzzy_matches(Vec2F32 p, D_FancyRunList *list, F32 max_x, FuzzyMatchRangeList *ranges, Vec4F32 color)
+dr_truncated_fancy_run_fuzzy_matches(Vec2F32 p, DR_FRunList *list, F32 max_x, FuzzyMatchRangeList *ranges, Vec4F32 color)
 {
   for(FuzzyMatchRangeNode *match_n = ranges->first; match_n != 0; match_n = match_n->next)
   {
@@ -565,45 +645,50 @@ d_truncated_fancy_run_fuzzy_matches(Vec2F32 p, D_FancyRunList *list, F32 max_x, 
     F32 advance = 0;
     F32 ascent = 0;
     F32 descent = 0;
-    for(D_FancyRunNode *fr_n = list->first; fr_n != 0; fr_n = fr_n->next)
+    for(DR_FRunNode *fr_n = list->first; fr_n != 0; fr_n = fr_n->next)
     {
-      D_FancyRun *fr = &fr_n->v;
-      F_Run *run = &fr->run;
+      DR_FRun *fr = &fr_n->v;
+      FNT_Run *run = &fr->run;
       ascent = run->ascent;
       descent = run->descent;
       for(U64 piece_idx = 0; piece_idx < run->pieces.count; piece_idx += 1)
       {
-        F_Piece *piece = &run->pieces.v[piece_idx];
+        FNT_Piece *piece = &run->pieces.v[piece_idx];
         if(contains_1u64(byte_range, byte_off))
         {
-          F32 pre_advance  = advance+piece->offset.x;
-          F32 post_advance = advance+piece->advance;
-          last_piece_end_pad = ((F32)piece->offset.x+(F32)dim_2s16(piece->subrect).x) - piece->advance;
+          F32 pre_advance  = advance + piece->offset.x;
+          F32 post_advance = advance + piece->advance;
           pixel_range.min = Min(pre_advance,  pixel_range.min);
           pixel_range.max = Max(post_advance, pixel_range.max);
         }
-        byte_off += piece->decode_size;
+        if(!fr->icon)
+        {
+          byte_off += piece->decode_size;
+        }
         advance += piece->advance;
       }
     }
     if(pixel_range.min < pixel_range.max)
     {
-      Rng2F32 rect = r2f32p(p.x + pixel_range.min, p.y - descent - ascent,
-                            p.x + pixel_range.max + last_piece_end_pad/2, p.y - descent - ascent + list->dim.y);
+      Rng2F32 rect = r2f32p(p.x + pixel_range.min - ascent/4.f,
+                            p.y - descent - ascent - ascent/8.f,
+                            p.x + pixel_range.max + ascent/4.f,
+                            p.y - descent - ascent + ascent/8.f + list->dim.y);
       rect.x0 = Min(rect.x0, p.x+max_x);
       rect.x1 = Min(rect.x1, p.x+max_x);
-      d_rect(rect, color, (descent+ascent)/4.f, 0, 1.f);
+      dr_rect(rect, color, (descent+ascent)/4.f, 0, 1.f);
     }
   }
 }
 
 internal void
-d_text_run(Vec2F32 p, Vec4F32 color, F_Run run)
+dr_text_run(Vec2F32 p, Vec4F32 color, FNT_Run run)
 {
+  ProfBeginFunction();
   F32 advance = 0;
-  F_Piece *piece_first = run.pieces.v;
-  F_Piece *piece_opl = piece_first + run.pieces.count;
-  for(F_Piece *piece = piece_first;
+  FNT_Piece *piece_first = run.pieces.v;
+  FNT_Piece *piece_opl = piece_first + run.pieces.count;
+  for(FNT_Piece *piece = piece_first;
       piece < piece_opl;
       piece += 1)
   {
@@ -616,150 +701,18 @@ d_text_run(Vec2F32 p, Vec4F32 color, F_Run run)
                          p.y + piece->offset.y + size.y);
     if(size.x != 0 && size.y != 0 && !r_handle_match(texture, r_handle_zero()))
     {
-      d_img(dst, src, texture, color, 0, 0, 0);
+      dr_img(dst, src, texture, color, 0, 0, 0);
     }
     advance += piece->advance;
   }
+  ProfEnd();
 }
 
 internal void
-d_truncated_text_run(Vec2F32 p, Vec4F32 color, F32 max_x, F_Run text_run, F_Run trailer_run)
-{
-  B32 truncated = 0;
-  B32 set_truncation = 0;
-  F32 truncation_p = p.x;
-  F32 max_x_minus_ellipses = max_x - trailer_run.dim.x;
-  F32 available_space = max_x - p.x;
-  
-  // rjf: find last piece before truncation
-  B32 truncation_needed = 0;
-  F_Piece *last_piece_before_truncation = 0;
-  F32 truncation_offset = 0;
-  if(available_space > text_run.dim.x || available_space > trailer_run.dim.x)
-  {
-    F32 advance = 0;
-    F_Piece *text_run_first = text_run.pieces.v;
-    F_Piece *text_run_opl = text_run_first + text_run.pieces.count;
-    for(F_Piece *piece = text_run_first;
-        piece < text_run_opl;
-        piece += 1)
-    {
-      Rng2F32 src = r2f32p((F32)piece->subrect.x0, (F32)piece->subrect.y0, (F32)piece->subrect.x1, (F32)piece->subrect.y1);
-      Vec2F32 size = dim_2f32(src);
-      Rng2F32 dst = r2f32p(p.x + piece->offset.x + advance,
-                           p.y + piece->offset.y,
-                           p.x + piece->offset.x + advance + size.x,
-                           p.y + piece->offset.y + size.y);
-      advance += piece->advance;
-      if(last_piece_before_truncation == 0 && p.x + advance > max_x_minus_ellipses)
-      {
-        truncation_offset = advance - piece->advance;
-        last_piece_before_truncation = piece;
-      }
-      if(p.x + advance > max_x)
-      {
-        truncation_needed = 1;
-      }
-    }
-  }
-  
-  // rjf: draw pieces
-  if(available_space > text_run.dim.x || available_space > trailer_run.dim.x)
-  {
-    F32 advance = 0;
-    F_Piece *text_run_first = text_run.pieces.v;
-    F_Piece *text_run_opl = text_run_first + text_run.pieces.count;
-    for(F_Piece *piece = text_run_first;
-        piece < text_run_opl;
-        piece += 1)
-    {
-      if(truncation_needed && piece == last_piece_before_truncation)
-      {
-        break;
-      }
-      R_Handle texture = piece->texture;
-      Rng2F32 src = r2f32p((F32)piece->subrect.x0, (F32)piece->subrect.y0, (F32)piece->subrect.x1, (F32)piece->subrect.y1);
-      Vec2F32 size = dim_2f32(src);
-      Rng2F32 dst = r2f32p(p.x + piece->offset.x + advance,
-                           p.y + piece->offset.y,
-                           p.x + piece->offset.x + advance + size.x,
-                           p.y + piece->offset.y + size.y);
-      if(size.x != 0 && size.y != 0 && !r_handle_match(texture, r_handle_zero()))
-      {
-        d_img(dst, src, texture, color, 0, 0, 0);
-      }
-      advance += piece->advance;
-    }
-  }
-  
-  // rjf: draw truncation ellipses
-  if(truncation_needed && last_piece_before_truncation != 0)
-  {
-    Vec2F32 ellipses_p = {p.x + truncation_offset, p.y};
-    Vec4F32 ellipses_color = color;
-    F32 advance = 0;
-    F_Piece *trailer_run_first = trailer_run.pieces.v;
-    F_Piece *trailer_run_opl = trailer_run_first + trailer_run.pieces.count;
-    for(F_Piece *piece = trailer_run_first;
-        piece < trailer_run_opl;
-        piece += 1)
-    {
-      R_Handle texture = piece->texture;
-      Rng2F32 src = r2f32p((F32)piece->subrect.x0, (F32)piece->subrect.y0, (F32)piece->subrect.x1, (F32)piece->subrect.y1);
-      Vec2F32 size = dim_2f32(src);
-      Rng2F32 dst = r2f32p(ellipses_p.x + piece->offset.x + advance,
-                           ellipses_p.y + piece->offset.y,
-                           ellipses_p.x + piece->offset.x + advance + size.x,
-                           ellipses_p.y + piece->offset.y + size.y);
-      if(size.x != 0 && size.y != 0 && !r_handle_match(texture, r_handle_zero()))
-      {
-        d_img(dst, src, texture, ellipses_color, 0, 0, 0);
-      }
-      ellipses_color.w *= 0.5f;
-      advance += piece->advance;
-    }
-  }
-}
-
-internal void
-d_text(F_Tag font, F32 size, F32 base_align_px, F32 tab_size_px, Vec2F32 p, Vec4F32 color, String8 string)
+dr_text(FNT_Tag font, F32 size, F32 base_align_px, F32 tab_size_px, FNT_RasterFlags flags, Vec2F32 p, Vec4F32 color, String8 string)
 {
   Temp scratch = scratch_begin(0, 0);
-  F_Run run = f_push_run_from_string(scratch.arena, font, size, base_align_px, tab_size_px, 0, string);
-  d_text_run(p, color, run);
-  scratch_end(scratch);
-}
-
-internal void
-d_textf(F_Tag font, F32 size, F32 base_align_px, F32 tab_size_px, Vec2F32 p, Vec4F32 color, char *fmt, ...)
-{
-  Temp scratch = scratch_begin(0, 0);
-  va_list args;
-  va_start(args, fmt);
-  String8 string = push_str8fv(scratch.arena, fmt, args);
-  va_end(args);
-  d_text(font, size, base_align_px, tab_size_px, p, color, string);
-  scratch_end(scratch);
-}
-
-internal void
-d_truncated_text(F_Tag font, F32 size, F32 base_align_px, F32 tab_size_px, Vec2F32 p, Vec4F32 color, F32 max_x, String8 string)
-{
-  Temp scratch = scratch_begin(0, 0);
-  F_Run run = f_push_run_from_string(scratch.arena, font, size, base_align_px, tab_size_px, 0, string);
-  F_Run ellipses_run = f_push_run_from_string(scratch.arena, font, size, base_align_px, tab_size_px, 0, str8_lit("..."));
-  d_truncated_text_run(p, color, max_x, run, ellipses_run);
-  scratch_end(scratch);
-}
-
-internal void
-d_truncated_textf(F_Tag font, F32 size, F32 base_align_px, F32 tab_size_px, Vec2F32 p, Vec4F32 color, F32 max_x, char *fmt, ...)
-{
-  Temp scratch = scratch_begin(0, 0);
-  va_list args;
-  va_start(args, fmt);
-  String8 string = push_str8f(scratch.arena, fmt, args);
-  d_truncated_text(font, size, base_align_px, tab_size_px, p, color, max_x, string);
-  va_end(args);
+  FNT_Run run = fnt_run_from_string(font, size, base_align_px, tab_size_px, flags, string);
+  dr_text_run(p, color, run);
   scratch_end(scratch);
 }

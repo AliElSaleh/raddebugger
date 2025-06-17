@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 #ifndef BASE_CONTEXT_CRACKING_H
@@ -155,11 +155,11 @@
 #endif
 
 #if !defined(BUILD_VERSION_MINOR)
-# define BUILD_VERSION_MINOR 0
+# define BUILD_VERSION_MINOR 9
 #endif
 
 #if !defined(BUILD_VERSION_PATCH)
-# define BUILD_VERSION_PATCH 0
+# define BUILD_VERSION_PATCH 20
 #endif
 
 #define BUILD_VERSION_STRING_LITERAL Stringify(BUILD_VERSION_MAJOR) "." Stringify(BUILD_VERSION_MINOR) "." Stringify(BUILD_VERSION_PATCH)
@@ -183,7 +183,7 @@
 #endif
 
 #if !defined(BUILD_ISSUES_LINK_STRING_LITERAL)
-# define BUILD_ISSUES_LINK_STRING_LITERAL "https://github.com/EpicGames/raddebugger/issues"
+# define BUILD_ISSUES_LINK_STRING_LITERAL "https://github.com/EpicGamesExt/raddebugger/issues"
 #endif
 
 #define BUILD_TITLE_STRING_LITERAL BUILD_TITLE " (" BUILD_VERSION_STRING_LITERAL " " BUILD_RELEASE_PHASE_STRING_LITERAL ") - " __DATE__ "" BUILD_GIT_HASH_STRING_LITERAL_APPEND BUILD_MODE_STRING_LITERAL_APPEND

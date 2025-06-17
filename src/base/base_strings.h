@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 #ifndef BASE_STRINGS_H
@@ -86,6 +86,7 @@ enum
 
 typedef enum PathStyle
 {
+  PathStyle_Null,
   PathStyle_Relative,
   PathStyle_WindowsAbsolute,
   PathStyle_UnixAbsolute,
@@ -95,7 +96,7 @@ typedef enum PathStyle
 #elif OS_LINUX
   PathStyle_SystemAbsolute = PathStyle_UnixAbsolute
 #else
-# error "absolute path style is undefined for this OS"
+# error Absolute path style is undefined for this OS.
 #endif
 }
 PathStyle;
@@ -192,6 +193,8 @@ internal String8  str8_cstring(char *c);
 internal String16 str16_cstring(U16 *c);
 internal String32 str32_cstring(U32 *c);
 internal String8  str8_cstring_capped(void *cstr, void *cap);
+internal String16 str16_cstring_capped(void *cstr, void *cap);
+internal String8  str8_cstring_capped_reverse(void *raw_start, void *raw_cap);
 
 ////////////////////////////////
 //~ rjf: String Stylization
@@ -203,9 +206,13 @@ internal String8 backslashed_from_str8(Arena *arena, String8 string);
 ////////////////////////////////
 //~ rjf: String Matching
 
+#define str8_match_lit(a_lit, b, flags)   str8_match(str8_lit(a_lit), (b), (flags))
+#define str8_match_cstr(a_cstr, b, flags) str8_match(str8_cstring(a_cstr), (b), (flags))
 internal B32 str8_match(String8 a, String8 b, StringMatchFlags flags);
 internal U64 str8_find_needle(String8 string, U64 start_pos, String8 needle, StringMatchFlags flags);
+internal U64 str8_find_needle_reverse(String8 string, U64 start_pos, String8 needle, StringMatchFlags flags);
 internal B32 str8_ends_with(String8 string, String8 end, StringMatchFlags flags);
+#define str8_ends_with_lit(string, end_lit, flags) str8_ends_with((string), str8_lit(end_lit), (flags))
 
 ////////////////////////////////
 //~ rjf: String Slicing
@@ -216,6 +223,7 @@ internal String8 str8_skip(String8 str, U64 amt);
 internal String8 str8_postfix(String8 str, U64 size);
 internal String8 str8_chop(String8 str, U64 amt);
 internal String8 str8_skip_chop_whitespace(String8 string);
+internal String8 str8_skip_chop_slashes(String8 string);
 
 ////////////////////////////////
 //~ rjf: String Formatting & Copying
@@ -231,13 +239,19 @@ internal String8 push_str8f(Arena *arena, char *fmt, ...);
 //- rjf: string -> integer
 internal S64 sign_from_str8(String8 string, String8 *string_tail);
 internal B32 str8_is_integer(String8 string, U32 radix);
+
 internal U64 u64_from_str8(String8 string, U32 radix);
 internal S64 s64_from_str8(String8 string, U32 radix);
+internal U32 u32_from_str8(String8 string, U32 radix);
+internal S32 s32_from_str8(String8 string, U32 radix);
 internal B32 try_u64_from_str8_c_rules(String8 string, U64 *x);
 internal B32 try_s64_from_str8_c_rules(String8 string, S64 *x);
 
 //- rjf: integer -> string
-internal String8 str8_from_memory_size(Arena *arena, U64 z);
+internal String8 str8_from_memory_size(Arena *arena, U64 size);
+internal String8 str8_from_count(Arena *arena, U64 count);
+internal String8 str8_from_bits_u32(Arena *arena, U32 x);
+internal String8 str8_from_bits_u64(Arena *arena, U64 x);
 internal String8 str8_from_u64(Arena *arena, U64 u64, U32 radix, U8 min_digits, U8 digit_group_separator);
 internal String8 str8_from_s64(Arena *arena, S64 s64, U32 radix, U8 min_digits, U8 digit_group_separator);
 
@@ -274,11 +288,33 @@ internal void         str8_list_from_flags(Arena *arena, String8List *list, U32 
 ////////////////////////////////
 //~ rjf; String Arrays
 
+internal String8Array str8_array_zero(void);
 internal String8Array str8_array_from_list(Arena *arena, String8List *list);
 internal String8Array str8_array_reserve(Arena *arena, U64 count);
+internal String8Array str8_array_copy(Arena *arena, String8Array array);
+
+////////////////////////////////
+//~ rjf: String Version Helpers
+
+internal U64 version_from_str8(String8 string);
+internal String8 str8_from_version(Arena *arena, U64 version);
 
 ////////////////////////////////
 //~ rjf: String Path Helpers
+
+global read_only struct
+{
+  String8   string;
+  PathStyle path_style;
+}
+g_path_style_map[] =
+{
+  { str8_lit_comp(""),         PathStyle_Null            },
+  { str8_lit_comp("relative"), PathStyle_Relative        },
+  { str8_lit_comp("windows"),  PathStyle_WindowsAbsolute },
+  { str8_lit_comp("unix"),     PathStyle_UnixAbsolute    },
+  { str8_lit_comp("system"),   PathStyle_SystemAbsolute  },
+};
 
 internal String8 str8_chop_last_slash(String8 string);
 internal String8 str8_skip_last_slash(String8 string);
@@ -310,12 +346,17 @@ internal String8 str8_from_32(Arena *arena, String32 in);
 internal String32 str32_from_8(Arena *arena, String8 in);
 
 ////////////////////////////////
+//~ String -> Enum Conversions
+
+internal OperatingSystem operating_system_from_string(String8 string);
+
+////////////////////////////////
 //~ rjf: Basic Types & Space Enum -> String Conversions
 
 internal String8 string_from_dimension(Dimension dimension);
 internal String8 string_from_side(Side side);
 internal String8 string_from_operating_system(OperatingSystem os);
-internal String8 string_from_architecture(Architecture arch);
+internal String8 string_from_arch(Arch arch);
 
 ////////////////////////////////
 //~ rjf: Time Types -> String
@@ -327,7 +368,25 @@ internal String8 push_file_name_date_time_string(Arena *arena, DateTime *date_ti
 internal String8 string_from_elapsed_time(Arena *arena, DateTime dt);
 
 ////////////////////////////////
-//~ rjf: Textual String Wrapping
+//~ Globally Unique Ids
+
+internal String8 string_from_guid(Arena *arena, Guid guid);
+internal B32     try_guid_from_string(String8 string, Guid *guid_out);
+internal Guid    guid_from_string(String8 string);
+
+////////////////////////////////
+//~ rjf: Basic Text Indentation
+
+internal String8 indented_from_string(Arena *arena, String8 string);
+
+////////////////////////////////
+//~ rjf: Text Escaping
+
+internal String8 escaped_from_raw_str8(Arena *arena, String8 string);
+internal String8 raw_from_escaped_str8(Arena *arena, String8 string);
+
+////////////////////////////////
+//~ rjf: Text Wrapping
 
 internal String8List wrapped_lines_from_string(Arena *arena, String8 string, U64 first_line_max_width, U64 max_width, U64 wrap_indent);
 
@@ -367,10 +426,17 @@ internal void    str8_serial_push_string(Arena *arena, String8List *srl, String8
 
 internal U64    str8_deserial_read(String8 string, U64 off, void *read_dst, U64 read_size, U64 granularity);
 internal U64    str8_deserial_find_first_match(String8 string, U64 off, U16 scan_val);
-internal void * str8_deserial_get_raw_ptr(String8 string, U64 off, U64 size);internal U64 str8_deserial_read_cstr(String8 string, U64 off, String8 *cstr_out);
+internal void * str8_deserial_get_raw_ptr(String8 string, U64 off, U64 size);
+internal U64    str8_deserial_read_cstr(String8 string, U64 off, String8 *cstr_out);
 internal U64    str8_deserial_read_windows_utf16_string16(String8 string, U64 off, String16 *str_out);
 internal U64    str8_deserial_read_block(String8 string, U64 off, U64 size, String8 *block_out);
 #define str8_deserial_read_array(string, off, ptr, count) str8_deserial_read((string), (off), (ptr), sizeof(*(ptr))*(count), sizeof(*(ptr)))
-#define str8_deserial_read_struct(string, off, ptr) str8_deserial_read((string), (off), (ptr), sizeof(*(ptr)), sizeof(*(ptr)))
+#define str8_deserial_read_struct(string, off, ptr)       str8_deserial_read_array(string, off, ptr, 1)
+
+////////////////////////////////
+//~ rjf: Basic String Hashes
+
+internal U64 u64_hash_from_seed_str8(U64 seed, String8 string);
+internal U64 u64_hash_from_str8(String8 string);
 
 #endif // BASE_STRINGS_H

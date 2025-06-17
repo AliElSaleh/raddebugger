@@ -1,10 +1,27 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 //- GENERATED CODE
 
 #ifndef CTRL_META_H
 #define CTRL_META_H
+
+typedef enum CTRL_EntityKind
+{
+CTRL_EntityKind_Null,
+CTRL_EntityKind_Root,
+CTRL_EntityKind_Machine,
+CTRL_EntityKind_Process,
+CTRL_EntityKind_Thread,
+CTRL_EntityKind_Module,
+CTRL_EntityKind_EntryPoint,
+CTRL_EntityKind_DebugInfoPath,
+CTRL_EntityKind_PendingThreadName,
+CTRL_EntityKind_PendingThreadColor,
+CTRL_EntityKind_Breakpoint,
+CTRL_EntityKind_AddressRangeAnnotation,
+CTRL_EntityKind_COUNT,
+} CTRL_EntityKind;
 
 typedef enum CTRL_ExceptionCodeKind
 {
@@ -50,6 +67,8 @@ CTRL_ExceptionCodeKind_COUNT,
 } CTRL_ExceptionCodeKind;
 
 C_LINKAGE_BEGIN
+extern String8 ctrl_entity_kind_code_name_table[12];
+extern String8 ctrl_entity_kind_display_string_table[12];
 extern U32 ctrl_exception_code_kind_code_table[38];
 extern String8 ctrl_exception_code_kind_display_string_table[38];
 extern String8 ctrl_exception_code_kind_lowercase_code_string_table[38];

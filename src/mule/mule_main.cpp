@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 /*
@@ -6,6 +6,13 @@
 ** stepping, breakpoints, evaluation, cross-module calls.
 */
 
+#include <string>
+#include <vector>
+#include <memory>
+#if !_WIN32
+# define RADDBG_MARKUP_STUBS
+#endif
+#define RADDBG_MARKUP_IMPLEMENTATION
 #include "lib_raddbg_markup/raddbg_markup.h"
 
 ////////////////////////////////
@@ -104,7 +111,8 @@ void optimized_struct_parameters_eval_tests(void);
 
 #include <stdint.h>
 
-struct Basics{
+struct Basics
+{
   char a;
   unsigned char b;
   short c;
@@ -115,11 +123,11 @@ struct Basics{
   unsigned long long h;
   float i;
   double j;
-  
   int z;
 };
 
-struct Basics_Stdint{
+struct Basics_Stdint
+{
   int8_t   a;
   uint8_t  b;
   int16_t  c;
@@ -132,22 +140,43 @@ struct Basics_Stdint{
   double   j;
 };
 
-struct Pair{
+struct Pair
+{
   int x;
   float y;
 };
 
-struct Fixed_Array{
+struct Fixed_Array
+{
   Pair pairs[10];
   int count;
 };
 
-struct Dynamic_Array{
+struct Dynamic_Array
+{
   Pair *pairs;
   int count;
 };
+raddbg_type_view(Dynamic_Array, slice($));
 
-struct Struct_With_Embedded_Arrays{
+template<typename T>
+struct TemplatedDynamicArray
+{
+  T *v;
+  int count;
+};
+raddbg_type_view(TemplatedDynamicArray<?>, rows($, count, array(v, count)));
+
+template<typename T>
+struct OpaqueTemplatedDynamicArray
+{
+  void *v;
+  int count;
+};
+raddbg_type_view(OpaqueTemplatedDynamicArray<?{type}>, array(cast(type *)v, count));
+
+struct Struct_With_Embedded_Arrays
+{
   int x;
   float y;
   Pair pairs[10];
@@ -168,15 +197,46 @@ struct Callback{
   Pair pair;
 };
 
-union Vector_R2{
-  struct{
+union Vector_R2
+{
+  struct
+  {
     float x;
     float y;
   };
   float v[2];
 };
+raddbg_type_view(Vector_R2, rows($, x, y));
 
-enum Kind{
+typedef union Matrix4x4F32 Matrix4x4F32;
+union Matrix4x4F32
+{
+  float elements[4][4];
+};
+raddbg_type_view(Matrix4x4F32, columns($.elements, $[0], $[1], $[2], $[3]));
+
+union PackedF16
+{
+  uint16_t v;
+  struct
+  {
+    uint16_t mantissa : 10;
+    uint16_t exponent : 5;
+    uint16_t sign : 1;
+  };
+};
+raddbg_type_view(PackedF16,
+                 exponent == 0 ? (0.00006103515625f*mantissa/1024.f) :
+                 (exponent == 31 && mantissa == 0 && sign == 1) ? "-infinity" :
+                 (exponent == 31 && mantissa == 0 && sign == 1) ? "+infinity" :
+                 (exponent == 31) ? "NaN" :
+                 (exponent < 15) ? (1.f/(1<<(15 - exponent)) * (sign * -2 + 1.f) * (1.f + mantissa/1024.f)) :
+                 (exponent > 15) ? ((1<<(exponent-15)) * (sign * -2 + 1.f) * (1.f + mantissa/1024.f)) :
+                 ((sign * -2 + 1) * 1.f + mantissa/1024.f));
+
+enum Kind
+{
+  Kind_Negative = -1,
   Kind_None,
   Kind_First,
   Kind_Second,
@@ -185,7 +245,8 @@ enum Kind{
   Kind_COUNT,
 };
 
-enum Flag{
+enum Flag
+{
   Flag_None = 0,
   Flag_First = 1,
   Flag_Second = 2,
@@ -196,30 +257,80 @@ enum Flag{
   Flag_All = 0xFFFFFFFF,
 };
 
-struct Has_Enums{
+struct Has_Enums
+{
   Kind kind;
   Flag flags;
 };
 
-struct Discriminated_Union{
+struct Discriminated_Union
+{
   Kind kind;
-  union{
-    struct{
+  union
+  {
+    struct
+    {
       int x;
       int y;
       Vector_R2 vector;
     } first;
     Pair second;
-    struct{
+    struct
+    {
       Function_Few_Params_Type *few_params;
       Pair pairs[4];
     } third;
-    struct{
+    struct
+    {
       Kind sub_kind;
       Flag flags;
     } fourth;
   };
 };
+raddbg_type_view(Discriminated_Union,
+                 kind == Kind.First ? first :
+                 kind == Kind.Second ? second :
+                 kind == Kind.Third ? third :
+                 kind == Kind.Fourth ? fourth :
+                 $);
+
+struct Crazy_Union
+{
+  Kind kind;
+  union
+  {
+    struct
+    {
+      int first_and_third__x;
+      int first_and_third__y;
+      int first_and_third__z;
+    } first_and_third;
+    struct
+    {
+      char *second__name;
+      Pair second__pairs[16];
+    } second;
+  };
+  union
+  {
+    struct
+    {
+      char *first__name;
+      int first__x;
+    } first;
+    struct
+    {
+      char *third__name;
+      Function_Few_Params_Type *third__few_params;
+    } third;
+  };
+};
+raddbg_type_view(Crazy_Union,
+                 kind == Kind.First ? rows($, first_and_third, first) :
+                 kind == Kind.Second ? rows($, second) :
+                 kind == Kind.Third ? rows($, first_and_third, third) :
+                 kind == Kind.Fourth ? kind :
+                 $);
 
 struct Linked_List{
   Linked_List *next;
@@ -252,6 +363,22 @@ struct Has_A_Post_Forward_Reference{
   struct Gets_Referenced_Forwardly value;
 };
 
+struct TypeWithMemberFunction
+{
+  int x;
+  int y;
+  int z;
+  char *name;
+  __declspec(noinline) void SetInfo(int _x, int _y, char *_name)
+  {
+    x = _x;
+    y = _y;
+    z = 0;
+    name = _name;
+    OutputDebugStringA("setting info\n");
+  }
+};
+
 static void
 no_params1(void){
   
@@ -263,8 +390,8 @@ few_params1(Pair *pairs, int count, Function_No_Params_Type *no_params_type){
 }
 
 static void
-type_coverage_eval_tests(void){
-  
+type_coverage_eval_tests(void)
+{
   Basics basics = {-1, 1, -2, 2, -4, 4, -8, 8, 1.5f, 1.50000000000001};
   Basics_Stdint basics_stdint = {-1, 1, -2, 2, -4, 4, -8, 8, 1.5f, 1.50000000000001};
   
@@ -278,11 +405,16 @@ type_coverage_eval_tests(void){
     L"This is a string, but instead of being encoded in a stream of bytes,\n"
     L"it is encoded in a stream of 2-byte packages!\n";
   
+  const char *const_string = "Hello, World!";
+  const char const_string_array[] = "Hello, World!";
+  const char *const const_ptr_const_string = "Hello, World!";
+  
   void *pointer = &basics;
   Basics *pointer_to_basics = &basics;
   Basics **pointer_to_pointer_to_basics = &pointer_to_basics;
   
-  Fixed_Array fixed = {
+  Fixed_Array fixed =
+  {
     {
       { 3,  4.f},
       { 5,  6.f},
@@ -296,7 +428,8 @@ type_coverage_eval_tests(void){
     },
     9
   };
-  Pair memory_[] = {
+  Pair memory_[] =
+  {
     {100,  1.f},
     {101,  2.f},
     {102,  4.f},
@@ -304,14 +437,29 @@ type_coverage_eval_tests(void){
     {104, 16.f},
     {105, 32.f},
   };
-  Dynamic_Array dynamic = {
+  Dynamic_Array dynamic =
+  {
     memory_,
     6
   };
   
+  TemplatedDynamicArray<Pair> templated_dynamic = {dynamic.pairs, dynamic.count};
+  TemplatedDynamicArray<Pair> templated_dynamics[] =
+  {
+    {dynamic.pairs, dynamic.count},
+    {dynamic.pairs, dynamic.count},
+    {dynamic.pairs, dynamic.count},
+    {dynamic.pairs, dynamic.count},
+    {dynamic.pairs, dynamic.count},
+  };
+  
+  OpaqueTemplatedDynamicArray<Pair> otd = {dynamic.pairs, dynamic.count};
+  
+  raddbg_pin(columns(sequence(6), fixed.pairs[$], memory_[$]));
   raddbg_pin(basics);
   raddbg_pin(fixed);
   raddbg_pin(pointer);
+  raddbg_pin(dynamic);
   
   Struct_With_Embedded_Arrays swea = {0};
   {
@@ -340,15 +488,49 @@ type_coverage_eval_tests(void){
   Function_Few_Params_Type **ptr_ptr_few_params = &ptr_few_params;
   Callback callback = {few_params1, no_params1, {1, 2.f}};
   
+  Matrix4x4F32 matrix =
+  {
+    {
+      {1.f, 0.f, 0.f, 0.f},
+      {0.f, 1.f, 0.f, 0.f},
+      {0.f, 0.f, 1.f, 0.f},
+      {0.f, 0.f, 0.f, 1.f},
+    }
+  };
+  
   Vector_R2 vector = {1.f, 2.f};
   
   Has_Enums has_enums = {(Kind)4, (Flag)7};
   
-  Discriminated_Union discriminated_union = {Kind_First};
+  Crazy_Union crazy_union = {};
+  
+  crazy_union.kind = Kind_First;
+  crazy_union.kind = Kind_Second;
+  crazy_union.kind = Kind_Third;
+  crazy_union.kind = Kind_Fourth;
+  
+  Discriminated_Union discriminated_union = {};
+  
+  discriminated_union.kind = Kind_First;
   discriminated_union.first.x = 16;
   discriminated_union.first.y = 8;
   discriminated_union.first.vector.x = 4.f;
   discriminated_union.first.vector.y = 2.f;
+  
+  discriminated_union.kind = Kind_Second;
+  discriminated_union.second.x = 123;
+  discriminated_union.second.y = 3.14f;
+  
+  discriminated_union.kind = Kind_Third;
+  discriminated_union.third.few_params = few_params1;
+  discriminated_union.third.pairs[0] = memory_[0];
+  discriminated_union.third.pairs[1] = memory_[1];
+  discriminated_union.third.pairs[2] = memory_[2];
+  discriminated_union.third.pairs[3] = memory_[3];
+  
+  discriminated_union.kind = Kind_Fourth;
+  discriminated_union.fourth.sub_kind = Kind_First;
+  discriminated_union.fourth.flags = (Flag)7;
   
   Linked_List list = {&list, &list, 0};
   
@@ -379,8 +561,64 @@ type_coverage_eval_tests(void){
   stks *stks_first = &stks_test[0];
   stks *stks_ptr = stks_first + 8;
   
+  TypeWithMemberFunction twmf = {0};
+  twmf.SetInfo(123, 456, "foobar");
+  
   TestFunction *function = mule_get_module_function("dll_type_eval_tests");
   function();
+  
+  int abc = 0;
+  for(int i = 0; i < 1000; i += 1)
+  {
+    if(i == 500)
+    {
+      abc+= 1;
+    }
+    int a = i + abc;
+    int b = a*5;
+  }
+  
+  char *names[] =
+  {
+    "samwise gamgee", "mithrandir", "grima wormtongue", "theodred", "theoden", "eomer", "eowyn",
+    "arwen", "sauron", "baggins", "proudfoot", "hardbottle", "bag end", "hobbiton",
+    "bree", "imladris", "isengard", "moria", "mount doom", "helm's deep", "bracegirdle",
+    "buckleberry ferry", "amun sul", "frodo", "bilbo", "buckland", "fangorn", "elrond",
+    "numenor", "treebeard", "shadowfax", "brego", "erod", "azufel", "dunedain",
+    "saruman", "aragorn", "gandalf", "meriadoc brandybuck", "peregrine took", "faramir", "boromir",
+    "ecthelion", "denethor", "mithrandil", "isildur", "haldir", "elessar", "elendil",
+    "dead marsh", "rohan", "gondor", "anarion", "earendil", "cirith ungol", "minas morghul",
+    "minas tirith", "barad-dur", "rivendell", "pellenor", "ithilien", "anduril", "narsil",
+    "edoras", "mordor", "osgiliath",
+  };
+  
+  for(int i = 0; i < sizeof(names)/sizeof(names[0]); i += 1)
+  {
+    OutputDebugStringA(names[i]);
+    OutputDebugStringA("\n");
+  }
+  
+  const int32_t x1 = 3;
+  const int32_t y1 = -10;
+  const int32_t z1 = x1 + y1;
+  
+  std::string small_cplusplus_string = "smallstr";
+  std::string cplusplus_string = "This is a C++ string!";
+  
+  std::vector<int> int_vector;
+  int_vector.push_back(1);
+  int_vector.push_back(2);
+  int_vector.push_back(3);
+  int_vector.push_back(4);
+  int_vector.push_back(5);
+  int_vector.push_back(6);
+  int_vector.push_back(7);
+  
+  std::vector<Dynamic_Array> dynamic_array_vector;
+  dynamic_array_vector.push_back(dynamic);
+  dynamic_array_vector.push_back(dynamic);
+  dynamic_array_vector.push_back(dynamic);
+  dynamic_array_vector.push_back(dynamic);
   
   int x = (int)(Anonymous_D);
 }
@@ -1145,6 +1383,7 @@ struct Base
   int x;
   int y;
   int z;
+  Base(){x = 1; y = 2; z = 3;}
   virtual ~Base() = default;
   virtual void Foo() = 0;
 };
@@ -1156,13 +1395,26 @@ struct Derived : Base
   int b;
   int a;
   virtual ~Derived() = default;
-  virtual void Foo() {a += 1;}
+  virtual void Foo()
+  {
+    x += 1;
+    y += 1;
+    y += 1;
+    z += 1;
+    z += 1;
+    z += 1;
+    a += 1;
+    a += 1;
+    a += 1;
+    a += 1;
+  }
 };
 
 struct DerivedA : Base
 {
   float a;
   float b;
+  DerivedA() {a = 123.f; b = 123.f;}
   virtual void Foo() {a += 1;}
   virtual ~DerivedA() = default;
 };
@@ -1171,6 +1423,7 @@ struct DerivedB : Base
 {
   double c;
   double d;
+  DerivedB() {c = 123.0; d = 123.0;}
   virtual void Foo() {c += 1;}
   virtual ~DerivedB() = default;
 };
@@ -1411,6 +1664,21 @@ extended_type_coverage_eval_tests(void){
     non_virtual_derived->x += 1;
     non_virtual_derived->x += 1;
     
+    std::unique_ptr<Base> ridiculous_cplusplus_base_class = std::make_unique<DerivedB>();
+    
+    std::vector<std::unique_ptr<Base>> ridiculous_cplusplus_array;
+    for(int i = 0; i < 1024; i += 1)
+    {
+      if((i & 1) == 1)
+      {
+        ridiculous_cplusplus_array.push_back(std::make_unique<DerivedA>());
+      }
+      else
+      {
+        ridiculous_cplusplus_array.push_back(std::make_unique<DerivedB>());
+      }
+    }
+    
     Base *base_array[1024] = {0};
     for(int i = 0; i < sizeof(base_array)/sizeof(base_array[0]); i += 1)
     {
@@ -1515,7 +1783,43 @@ extern "C"{
 }
 
 ////////////////////////////////
+//~ rjf: Basic Inline Line Info Tests
+
+#if defined(_MSC_VER)
+# define FORCE_INLINE __forceinline
+#elif defined(__clang__)
+# define FORCE_INLINE  __attribute__((always_inline))
+#else
+# error need force inline for this compiler
+#endif
+
+static FORCE_INLINE void
+basic_inlinee(int inlinee_param_x, int inlinee_param_y, int inlinee_param_z)
+{
+  OutputDebugStringA("A\n");
+  OutputDebugStringA("B\n");
+  OutputDebugStringA("C\n");
+  OutputDebugStringA("D\n");
+}
+
+static void
+basic_inline_tests(void)
+{
+  OutputDebugStringA("{\n");
+  basic_inlinee(12, 34, 56);
+  OutputDebugStringA("}\n");
+}
+
+////////////////////////////////
 //~ rjf: Fancy Visualization Eval Tests
+
+struct Bitmap
+{
+  unsigned char *base;
+  int width;
+  int height;
+};
+raddbg_type_view(Bitmap, bitmap(base, width, height));
 
 static unsigned int
 mule_bswap_u32(unsigned int x)
@@ -1530,11 +1834,34 @@ mule_bswap_u32(unsigned int x)
 static void
 fancy_viz_eval_tests(void)
 {
+  //- rjf: windows -> GetLastError
+#if _WIN32
+  DWORD error_code = 0;
+  SetLastError(1234);
+  error_code = GetLastError();
+  SetLastError(4567);
+  error_code = GetLastError();
+  (void)error_code;
+#endif
+  
+  //- rjf: booleans (checkboxes)
+  bool bool1 = 0; raddbg_pin(bool1);
+  bool bool2 = 1; raddbg_pin(bool2);
+  bool bool3 = 0; raddbg_pin(bool3);
+  
+  //- rjf: sliders
+  float slide1 = 500.f; raddbg_pin(range1(slide1, 0, 1000));
+  double slide2 = 0.75; raddbg_pin(range1(slide2, 0, 1.0));
+  int slide3 = 25;      raddbg_pin(range1(slide3, 0, 100));
+  
   //- rjf: colors
   float example_color_4f32[4] = {1.00f, 0.85f, 0.25f, 1.00f};
   unsigned int example_color_u32 = 0xff6f30ff;
   struct {float r, g, b, a;} example_color_struct = {0.50f, 0.95f, 0.75f, 1.00f};
   int x0 = 0;
+  raddbg_pin(color(example_color_4f32));
+  raddbg_pin(color(example_color_u32));
+  raddbg_pin(color(example_color_struct));
   
   //- rjf: multiline text
   char *long_string = ("This is an example of some very long text with line breaks\n"
@@ -1549,9 +1876,56 @@ fancy_viz_eval_tests(void)
                        "  return 0;\n"
                        "}\n\n");
   int x1 = 0;
-  raddbg_pin(long_string,          "text");
-  raddbg_pin(code_string,          "text: (lang:c)");
-  raddbg_pin(fancy_viz_eval_tests, "disasm: (arch:x64)");
+  raddbg_pin(text(long_string));
+  raddbg_pin(text(code_string, lang=c));
+  raddbg_pin(disasm(fancy_viz_eval_tests));
+  
+  //- rjf: programmatic memory annotations
+  void *some_block_of_memory = malloc(256);
+  memset(some_block_of_memory, 0x27, 256);
+  raddbg_annotate_vaddr_range(some_block_of_memory, 256, "test memory annotation");
+  
+  //- rjf: half-floats
+  PackedF16 f16s[] =
+  {
+    {0x0001}, // ~0.000000059604645
+    {0x03ff}, // ~0.000060975552
+    {0x0400}, // ~0.00006103515625
+    {0x3555}, // ~0.33325195
+    {0x3bff}, // ~0.99951172
+    {0x3c00}, // 1
+    {0x3c01}, // 1.00097656
+    {0x7bff}, // 65504,
+    {0x7c00}, // +inf
+    {0xfc00}, // -inf
+  };
+  
+  //- rjf: table index lookups
+  struct
+  {
+    char *name;
+    int x;
+    int y;
+    int z;
+  }
+  nodes[] =
+  {
+    {"---",     1,  7,  3},
+    {"---",     5,  4,  2},
+    {"second", 12, 41, 22},
+    {"---",     8,  9,  1},
+    {"---",     1,  1,  1},
+    {"first",  50, 50, 50},
+    {"fourth",  7,  7,  7},
+    {"---",     7, 12,  1},
+    {"third",  27, 43, 41},
+    {"---",     2, 17, 50},
+  };
+  int node_indices[] =
+  {
+    5, 2, 8, 6
+  };
+  raddbg_pin(columns(node_indices, nodes[$]));
   
   //- rjf: bitmaps
   unsigned int background_color = 0x00000000;
@@ -1562,7 +1936,7 @@ fancy_viz_eval_tests(void)
   unsigned int cl = mule_bswap_u32(main_color);
   unsigned int sn = mule_bswap_u32(shine_color);
   unsigned int sh = mule_bswap_u32(shadow_color);
-  unsigned int bitmap[] =
+  unsigned int pixels[] =
   {
     bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg,
     bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg,
@@ -1583,35 +1957,45 @@ fancy_viz_eval_tests(void)
     bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg,
     bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg, bg,
   };
-  raddbg_pin(bitmap, "bitmap:(w:18, h:18)");
-  for(int i = 0; i < sizeof(bitmap)/sizeof(bitmap[0]); i += 1)
+  raddbg_pin(bitmap(pixels, 18, 18));
+  for(int i = 0; i < sizeof(pixels)/sizeof(pixels[0]); i += 1)
   {
-    unsigned int r = bitmap[i]&0x000000ff;
-    unsigned int a = bitmap[i]&0xff000000;
-    bitmap[i] = bitmap[i]>>8;
-    bitmap[i] &= ~0xffff0000;
-    bitmap[i] |= (r<<16);
-    bitmap[i] |= (a);
+    unsigned int r = pixels[i]&0x000000ff;
+    unsigned int a = pixels[i]&0xff000000;
+    pixels[i] = pixels[i]>>8;
+    pixels[i] &= ~0xffff0000;
+    pixels[i] |= (r<<16);
+    pixels[i] |= (a);
   }
-  for(int i = 0; i < sizeof(bitmap)/sizeof(bitmap[0]); i += 1)
+  for(int i = 0; i < sizeof(pixels)/sizeof(pixels[0]); i += 1)
   {
-    unsigned int r = bitmap[i]&0x000000ff;
-    unsigned int a = bitmap[i]&0xff000000;
-    bitmap[i] = bitmap[i]>>8;
-    bitmap[i] &= ~0xffff0000;
-    bitmap[i] |= (r<<16);
-    bitmap[i] |= (a);
+    unsigned int r = pixels[i]&0x000000ff;
+    unsigned int a = pixels[i]&0xff000000;
+    pixels[i] = pixels[i]>>8;
+    pixels[i] &= ~0xffff0000;
+    pixels[i] |= (r<<16);
+    pixels[i] |= (a);
   }
-  for(int i = 0; i < sizeof(bitmap)/sizeof(bitmap[0]); i += 1)
+  for(int i = 0; i < sizeof(pixels)/sizeof(pixels[0]); i += 1)
   {
-    unsigned int r = bitmap[i]&0x000000ff;
-    unsigned int a = bitmap[i]&0xff000000;
-    bitmap[i] = bitmap[i]>>8;
-    bitmap[i] &= ~0xffff0000;
-    bitmap[i] |= (r<<16);
-    bitmap[i] |= (a);
+    unsigned int r = pixels[i]&0x000000ff;
+    unsigned int a = pixels[i]&0xff000000;
+    pixels[i] = pixels[i]>>8;
+    pixels[i] &= ~0xffff0000;
+    pixels[i] |= (r<<16);
+    pixels[i] |= (a);
   }
   int x2 = 0;
+  
+  //- rjf: type-viewed bitmaps
+  Bitmap foo = {(unsigned char *)&pixels[0], 18, 18};
+  raddbg_pin(foo);
+  
+  //- rjf: name collisions with debugger rules
+  Function_Few_Params_Type *raw = 0;
+  char *text = "some_important_text_here\n";
+  Bitmap bitmap = foo;
+  int x3 = 0;
   
   //- rjf: 3D geometry
   float vertex_data[] = // pos.x, pos.y, pos.z, nor.x, nor.y, nor.z, tex.u, tex.v, col.r, col.g, col.b, ...
@@ -1800,12 +2184,33 @@ fancy_viz_eval_tests(void)
     136, 137, 138, 138, 139, 136, 140, 141, 142, 142, 143, 140, 144, 145, 146, 146, 147, 144, 148, 149, 150, 150, 151, 148,
     152, 153, 154, 154, 155, 152, 156, 157, 158, 158, 159, 156, 160, 161, 162, 162, 163, 160, 164, 165, 166, 166, 167, 164,
   };
-  raddbg_pin(index_data, "geo: { count:(sizeof index_data / 4), vertices_base:(vertex_data), vertices_size:(sizeof vertex_data) }");
-  int x3 = 0;
+  int count = (sizeof index_data/4);
+  float *vtx = vertex_data;
+  int vtx_size = sizeof vertex_data;
+  raddbg_pin(geo3d(index_data, count = count, vtx = vtx, vtx_size = vtx_size));
+  int x4 = 0;
 }
 
 ////////////////////////////////
-// NOTE(allen): Function Overload Resolution
+//~ rjf: Markup Tests
+
+static void
+markup_tests(void)
+{
+  int x = 0;
+  raddbg_add_breakpoint(&x, sizeof(x), 0, 1, 0);
+  for(int i = 0; i < 10000; i += 1)
+  {
+    if(i == 5000)
+    {
+      x += 1;
+    }
+  }
+  raddbg_remove_breakpoint(&x, sizeof(x), 0, 1, 0);
+}
+
+////////////////////////////////
+//~ NOTE(allen): Function Overload Resolution
 
 static int
 overloaded_function(float y){
@@ -2259,16 +2664,103 @@ recursion_stepping_tests(void){
 }
 
 ////////////////////////////////
+// NOTE(rjf): Thread Stepping
+
+#if _WIN32
+DWORD thread_step_thread(void *p)
+{
+  int x = 0;
+  for(int i = 0; i < 100000; i += 1)
+  {
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+    x += 1;
+  }
+  return 0;
+}
+#endif
+
+void thread_stepping_tests(void)
+{
+#if _WIN32
+  HANDLE h[8] = {0};
+  for(int i = 0; i < sizeof(h)/sizeof(h[0]); i += 1)
+  {
+    DWORD id = 0;
+    h[i] = CreateThread(0, 0, thread_step_thread, 0, CREATE_SUSPENDED, &id);
+    raddbg_thread_id_name(id, "thread_step_thread_%i", i);
+    raddbg_thread_id_color_u32(id, 0xff9f23ff);
+  }
+  for(int i = 0; i < sizeof(h)/sizeof(h[0]); i += 1)
+  {
+    ResumeThread(h[i]);
+  }
+  for(int i = 0; i < sizeof(h)/sizeof(h[0]); i += 1)
+  {
+    WaitForSingleObject(h[i], INFINITE);
+  }
+#endif
+}
+
+////////////////////////////////
 // NOTE(rjf): Debug Strings
 
 static void
 debug_string_tests(void)
 {
+  for(int i = 0; i < 100; i += 1)
+  {
+    printf("here is a number: %i\n", i);
+    fflush(stdout);
+  }
 #if _WIN32
   for(int i = 0; i < 100; i += 1)
   {
     OutputDebugStringA("Hello, World!\n");
   }
+  char message[65409+1];
+  memset(&message[0], '=', sizeof(message));
+  for(int i = 1; i < sizeof(message); i += 128)
+  {
+    message[i] = '\n';
+  }
+  message[sizeof(message) - 1] = 0;
+  OutputDebugStringA(message);
+#endif
+}
+
+////////////////////////////////
+//~ rjf: Thread Name Test
+
+#if _WIN32
+DWORD dummy_thread(void *p)
+{
+  Sleep(10);
+  return 0;
+}
+#endif
+
+static void
+thread_name_tests(void)
+{
+#if _WIN32
+  DWORD id = 0;
+  HANDLE h = CreateThread(0, 0, dummy_thread, 0, CREATE_SUSPENDED, &id);
+  raddbg_thread_id_name(id, "dummy_thread");
+  raddbg_thread_id_color_u32(id, 0xff1f23ff);
+  ResumeThread(h);
+  WaitForSingleObject(h, INFINITE);
 #endif
 }
 
@@ -2316,6 +2808,19 @@ jit_stepping_tests(void)
 
 ////////////////////////////////
 // NOTE(allen): Exception Stepping
+
+static void
+exception_filter_test(void)
+{
+  __try
+  {
+    RaiseException(0xc0000095, 0, 0, 0);
+  }
+  __except (EXCEPTION_EXECUTE_HANDLER)
+  {
+    OutputDebugStringA("did an exception\n");
+  }
+}
 
 int *global_null_read_pointer = 0;
 static void
@@ -2540,21 +3045,31 @@ static void
 dynamic_step_test(void){
 #if _WIN32
 #if defined(_x86_64) || defined( __x86_64__ ) || defined( _M_X64 ) || defined( _M_AMD64 )
-	void *page = VirtualAlloc(0, 4096, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+  void *page = VirtualAlloc(0, 4096, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
   char *ptr = (char*)page;
   *ptr++ =  0x51; // push rcx
   *ptr++ = 0x59; // pop rcx
   *ptr++ = 0xC3; // ret
-	callback_t cb = (callback_t)page;
-	cb(1);
+  callback_t cb = (callback_t)page;
+  cb(1);
 #endif
 #endif
 }
 
 ////////////////////////////////
 
+raddbg_entry_point(mule_main);
+
 int
-mule_main(int argc, char** argv){
+mule_main(int argc, char** argv)
+{
+  raddbg_thread_name("mule_main_thread");
+  raddbg_thread_color_rgba(0.4f, 0.9f, 0.2f, 1);
+  if(raddbg_is_attached())
+  {
+    raddbg_log("raddbg is attached!\n");
+  }
+  
   mule_init();
   
   // NOTE(allen): Eval Tests
@@ -2588,12 +3103,18 @@ mule_main(int argc, char** argv){
   
   fancy_viz_eval_tests();
   
+  exception_filter_test();
+  
+  markup_tests();
+  
   // NOTE(allen): Stepping Tests
   control_flow_stepping_tests();
   
   indirect_call_jump_stepping_tests();
   
   alloca_stepping_tests();
+  
+  basic_inline_tests();
   
   inline_stepping_tests();
   
@@ -2607,7 +3128,11 @@ mule_main(int argc, char** argv){
   
   recursion_stepping_tests();
   
+  thread_stepping_tests();
+  
   debug_string_tests();
+  
+  thread_name_tests();
   
   jit_stepping_tests();
   
@@ -2617,5 +3142,3 @@ mule_main(int argc, char** argv){
   
   return(0);
 }
-
-

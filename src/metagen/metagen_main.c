@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 ////////////////////////////////
@@ -24,17 +24,14 @@
 ////////////////////////////////
 //~ rjf: Entry Point
 
-int main(int argument_count, char **arguments)
+internal void
+entry_point(CmdLine *cmdline)
 {
-  local_persist TCTX main_tctx = {0};
-  tctx_init_and_equip(&main_tctx);
-  os_init(argument_count, arguments);
-  
   //////////////////////////////
   //- rjf: set up state
   //
   MG_MsgList msgs = {0};
-  mg_arena = arena_alloc__sized(GB(64), MB(64));
+  mg_arena = arena_alloc(.reserve_size = GB(64), .commit_size = MB(64));
   mg_state = push_array(mg_arena, MG_State, 1);
   mg_state->slots_count = 256;
   mg_state->slots = push_array(mg_arena, MG_LayerSlot, mg_state->slots_count);
@@ -42,7 +39,7 @@ int main(int argument_count, char **arguments)
   //////////////////////////////
   //- rjf: extract paths
   //
-  String8 build_dir_path   = os_string_from_system_path(mg_arena, OS_SystemPath_Binary);
+  String8 build_dir_path   = os_get_process_info()->binary_path;
   String8 project_dir_path = str8_chop_last_slash(build_dir_path);
   String8 code_dir_path    = push_str8f(mg_arena, "%S/src", project_dir_path);
   
@@ -132,7 +129,7 @@ int main(int argument_count, char **arguments)
     for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
     {
       MD_Node *file = n->v.root;
-      for(MD_EachNode(node, file->first))
+      for MD_EachNode(node, file->first)
       {
         MD_Node *table_tag = md_tag_from_string(node, str8_lit("table"), 0);
         if(!md_node_is_nil(table_tag))
@@ -157,7 +154,7 @@ int main(int argument_count, char **arguments)
     MD_Node *file = n->v.root;
     String8 layer_key = mg_layer_key_from_path(file->string);
     MG_Layer *layer = mg_layer_from_key(layer_key);
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       if(md_node_has_tag(node, str8_lit("option"), 0))
       {
@@ -223,7 +220,7 @@ int main(int argument_count, char **arguments)
   for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
   {
     MD_Node *file = n->v.root;
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       MD_Node *tag = md_tag_from_string(node, str8_lit("enum"), 0);
       if(!md_node_is_nil(tag))
@@ -249,8 +246,7 @@ int main(int argument_count, char **arguments)
         }
         for(String8Node *n = gen_strings.first; n != 0; n = n->next)
         {
-          String8 escaped = mg_escaped_from_str8(mg_arena, n->string);
-          str8_list_pushf(mg_arena, &layer->enums, "%S_%S,\n", enum_member_prefix, escaped);
+          str8_list_pushf(mg_arena, &layer->enums, "%S_%S,\n", enum_member_prefix, n->string);
         }
         if(enum_base_type_name.size == 0)
         {
@@ -270,7 +266,7 @@ int main(int argument_count, char **arguments)
   for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
   {
     MD_Node *file = n->v.root;
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       MD_Node *tag = md_tag_from_string(node, str8_lit("xlist"), 0);
       if(!md_node_is_nil(tag))
@@ -281,8 +277,7 @@ int main(int argument_count, char **arguments)
         str8_list_pushf(mg_arena, &layer->enums, "#define %S \\\n", node->string);
         for(String8Node *n = gen_strings.first; n != 0; n = n->next)
         {
-          String8 escaped = mg_escaped_from_str8(mg_arena, n->string);
-          str8_list_pushf(mg_arena, &layer->enums, "X(%S)\\\n", escaped);
+          str8_list_pushf(mg_arena, &layer->enums, "X(%S)\\\n", n->string);
         }
         str8_list_push(mg_arena, &layer->enums, str8_lit("\n"));
       }
@@ -295,7 +290,7 @@ int main(int argument_count, char **arguments)
   for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
   {
     MD_Node *file = n->v.root;
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       if(md_node_has_tag(node, str8_lit("struct"), 0))
       {
@@ -306,8 +301,7 @@ int main(int argument_count, char **arguments)
         str8_list_pushf(mg_arena, &layer->structs, "struct %S\n{\n", node->string);
         for(String8Node *n = gen_strings.first; n != 0; n = n->next)
         {
-          String8 escaped = mg_escaped_from_str8(mg_arena, n->string);
-          str8_list_pushf(mg_arena, &layer->structs, "%S;\n", escaped);
+          str8_list_pushf(mg_arena, &layer->structs, "%S;\n", n->string);
         }
         str8_list_pushf(mg_arena, &layer->structs, "};\n\n");
       }
@@ -320,7 +314,7 @@ int main(int argument_count, char **arguments)
   for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
   {
     MD_Node *file = n->v.root;
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       MD_Node *tag = md_tag_from_string(node, str8_lit("data"), 0);
       if(!md_node_is_nil(tag))
@@ -336,8 +330,7 @@ int main(int argument_count, char **arguments)
         str8_list_pushf(mg_arena, &layer->c_tables, "%S %S[%I64u] =\n{\n", element_type, node->string, gen_strings.node_count);
         for(String8Node *n = gen_strings.first; n != 0; n = n->next)
         {
-          String8 escaped = mg_escaped_from_str8(mg_arena, n->string);
-          str8_list_pushf(mg_arena, &layer->c_tables, "%S,\n", escaped);
+          str8_list_pushf(mg_arena, &layer->c_tables, "%S,\n", n->string);
         }
         str8_list_push(mg_arena, &layer->c_tables, str8_lit("};\n\n"));
       }
@@ -350,7 +343,7 @@ int main(int argument_count, char **arguments)
   for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
   {
     MD_Node *file = n->v.root;
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       MD_Node *tag = md_tag_from_string(node, str8_lit("enum2string_switch"), 0);
       if(!md_node_is_nil(tag))
@@ -367,8 +360,7 @@ int main(int argument_count, char **arguments)
         str8_list_pushf(mg_arena, &layer->c_functions, "default:{}break;\n");
         for(String8Node *n = gen_strings.first; n != 0; n = n->next)
         {
-          String8 escaped = mg_escaped_from_str8(mg_arena, n->string);
-          str8_list_pushf(mg_arena, &layer->c_functions, "%S;\n", escaped);
+          str8_list_pushf(mg_arena, &layer->c_functions, "%S;\n", n->string);
         }
         str8_list_pushf(mg_arena, &layer->c_functions, "}\n");
         str8_list_pushf(mg_arena, &layer->c_functions, "return result;\n");
@@ -383,7 +375,7 @@ int main(int argument_count, char **arguments)
   for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
   {
     MD_Node *file = n->v.root;
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       MD_Node *tag = md_tag_from_string(node, str8_lit("gen"), 0);
       if(!md_node_is_nil(tag))
@@ -401,8 +393,7 @@ int main(int argument_count, char **arguments)
         for(String8Node *n = gen_strings.first; n != 0; n = n->next)
         {
           String8 trimmed = str8_skip_chop_whitespace(n->string);
-          String8 escaped = mg_escaped_from_str8(mg_arena, trimmed);
-          str8_list_push(mg_arena, out, escaped);
+          str8_list_push(mg_arena, out, trimmed);
           str8_list_push(mg_arena, out, str8_lit("\n"));
         }
       }
@@ -415,7 +406,7 @@ int main(int argument_count, char **arguments)
   for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
   {
     MD_Node *file = n->v.root;
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       if(md_node_has_tag(node, str8_lit("embed_string"), 0))
       {
@@ -449,7 +440,7 @@ int main(int argument_count, char **arguments)
   for(MG_FileParseNode *n = parses.first; n != 0; n = n->next)
   {
     MD_Node *file = n->v.root;
-    for(MD_EachNode(node, file->first))
+    for MD_EachNode(node, file->first)
     {
       //- rjf: generate markdown page
       if(md_node_has_tag(node, str8_lit("markdown"), 0))
@@ -545,7 +536,7 @@ int main(int argument_count, char **arguments)
           }
           {
             FILE *h = fopen((char *)h_path.str, "w");
-            fprintf(h, "// Copyright (c) 2024 Epic Games Tools\n");
+            fprintf(h, "// Copyright (c) Epic Games Tools\n");
             fprintf(h, "// Licensed under the MIT license (https://opensource.org/license/mit/)\n\n");
             if(layer->h_header.first == 0)
             {
@@ -601,7 +592,7 @@ int main(int argument_count, char **arguments)
           }
           {
             FILE *c = fopen((char *)c_path.str, "w");
-            fprintf(c, "// Copyright (c) 2024 Epic Games Tools\n");
+            fprintf(c, "// Copyright (c) Epic Games Tools\n");
             fprintf(c, "// Licensed under the MIT license (https://opensource.org/license/mit/)\n\n");
             if(layer->c_header.first == 0)
             {
@@ -656,6 +647,4 @@ int main(int argument_count, char **arguments)
     MG_Msg *msg = &n->v;
     fprintf(stderr, "%.*s: %.*s: %.*s\n", str8_varg(msg->location), str8_varg(msg->kind), str8_varg(msg->msg));
   }
-  
-  return 0;
 }

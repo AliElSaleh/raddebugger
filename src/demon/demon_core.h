@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 #ifndef DEMON_CORE_H
@@ -15,7 +15,7 @@
 typedef struct DMN_CtrlCtx DMN_CtrlCtx;
 struct DMN_CtrlCtx
 {
-  U64 u64 [1];
+  U64 u64[1];
 };
 
 ////////////////////////////////
@@ -68,12 +68,12 @@ struct DMN_Event
   DMN_Handle process;
   DMN_Handle thread;
   DMN_Handle module;
-  Architecture arch;
+  Arch arch;
   U64 address;
   U64 size;
   String8 string;
   U32 code; // code gives pid & tid on CreateProcess and CreateThread (respectfully)
-  U32 flags;
+  U32 flags; // DMN_TrapFlags, if `DMN_EventKind_SetBreakpoint`
   S32 signo;
   S32 sigcode;
   U64 instruction_pointer;
@@ -100,12 +100,22 @@ struct DMN_EventList
 ////////////////////////////////
 //~ rjf: Run Control Types
 
+typedef U32 DMN_TrapFlags;
+enum
+{
+  DMN_TrapFlag_BreakOnWrite   = (1<<0),
+  DMN_TrapFlag_BreakOnRead    = (1<<1),
+  DMN_TrapFlag_BreakOnExecute = (1<<2),
+};
+
 typedef struct DMN_Trap DMN_Trap;
 struct DMN_Trap
 {
   DMN_Handle process;
   U64 vaddr;
   U64 id;
+  DMN_TrapFlags flags;
+  U32 size;
 };
 
 typedef struct DMN_TrapChunkNode DMN_TrapChunkNode;
@@ -181,6 +191,11 @@ internal U64 dmn_rip_from_thread(DMN_Handle thread);
 internal U64 dmn_rsp_from_thread(DMN_Handle thread);
 
 ////////////////////////////////
+//~ rjf: Process Reading Helper Functions (Helpers, Implemented Once)
+
+internal String8 dmn_process_read_cstring(Arena *arena, DMN_Handle process, U64 addr);
+
+////////////////////////////////
 //~ rjf: @dmn_os_hooks Main Layer Initialization (Implemented Per-OS)
 
 internal void dmn_init(void);
@@ -192,7 +207,7 @@ internal DMN_CtrlCtx *dmn_ctrl_begin(void);
 internal void dmn_ctrl_exclusive_access_begin(void);
 internal void dmn_ctrl_exclusive_access_end(void);
 #define DMN_CtrlExclusiveAccessScope DeferLoop(dmn_ctrl_exclusive_access_begin(), dmn_ctrl_exclusive_access_end())
-internal U32 dmn_ctrl_launch(DMN_CtrlCtx *ctx, OS_LaunchOptions *options);
+internal U32 dmn_ctrl_launch(DMN_CtrlCtx *ctx, OS_ProcessLaunchParams *params);
 internal B32 dmn_ctrl_attach(DMN_CtrlCtx *ctx, U32 pid);
 internal B32 dmn_ctrl_kill(DMN_CtrlCtx *ctx, DMN_Handle process, U32 exit_code);
 internal B32 dmn_ctrl_detach(DMN_CtrlCtx *ctx, DMN_Handle process);
@@ -217,13 +232,18 @@ internal void dmn_access_close(void);
 #define DMN_AccessScope DeferLoopChecked(dmn_access_open(), dmn_access_close())
 
 //- rjf: processes
+internal U64 dmn_process_memory_reserve(DMN_Handle process, U64 vaddr, U64 size);
+internal void dmn_process_memory_commit(DMN_Handle process, U64 vaddr, U64 size);
+internal void dmn_process_memory_decommit(DMN_Handle process, U64 vaddr, U64 size);
+internal void dmn_process_memory_release(DMN_Handle process, U64 vaddr, U64 size);
+internal void dmn_process_memory_protect(DMN_Handle process, U64 vaddr, U64 size, OS_AccessFlags flags);
 internal U64 dmn_process_read(DMN_Handle process, Rng1U64 range, void *dst);
 internal B32 dmn_process_write(DMN_Handle process, Rng1U64 range, void *src);
 #define dmn_process_read_struct(process, vaddr, ptr) dmn_process_read((process), r1u64((vaddr), (vaddr)+(sizeof(*ptr))), ptr)
 #define dmn_process_write_struct(process, vaddr, ptr) dmn_process_write((process), r1u64((vaddr), (vaddr)+(sizeof(*ptr))), ptr)
 
 //- rjf: threads
-internal Architecture dmn_arch_from_thread(DMN_Handle handle);
+internal Arch dmn_arch_from_thread(DMN_Handle handle);
 internal U64 dmn_stack_base_vaddr_from_thread(DMN_Handle handle);
 internal U64 dmn_tls_root_vaddr_from_thread(DMN_Handle handle);
 internal B32 dmn_thread_read_reg_block(DMN_Handle handle, void *reg_block);

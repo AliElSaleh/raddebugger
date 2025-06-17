@@ -1,10 +1,37 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 ////////////////////////////////
 //~ rjf: Generated Code
 
 #include "generated/render.meta.c"
+
+////////////////////////////////
+//~ rjf: Helpers
+
+internal Mat4x4F32
+r_sample_channel_map_from_tex2dformat(R_Tex2DFormat fmt)
+{
+  Mat4x4F32 result =
+  {
+    {
+      {1, 0, 0, 0},
+      {0, 1, 0, 0},
+      {0, 0, 1, 0},
+      {0, 0, 0, 1},
+    }
+  };
+  switch(fmt)
+  {
+    default:{}break;
+    case R_Tex2DFormat_R8:
+    {
+      MemoryZeroArray(result.v[0]);
+      result.v[0][0] = result.v[0][1] = result.v[0][2] = result.v[0][3] = 1.f;
+    }break;
+  }
+  return result;
+}
 
 ////////////////////////////////
 //~ rjf: Basic Type Functions
@@ -19,7 +46,7 @@ r_handle_zero(void)
 internal B32
 r_handle_match(R_Handle a, R_Handle b)
 {
-  return a.u64[0] == b.u64[0] && a.u64[1] == b.u64[1];
+  return MemoryMatchStruct(&a, &b);
 }
 
 ////////////////////////////////

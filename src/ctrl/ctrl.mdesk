@@ -1,8 +1,46 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 ////////////////////////////////
-//~ rjf: Tables
+//~ rjf: Entity Kinds
+
+@table(name  code_name  display_string)
+CTRL_EntityKindTable:
+{
+  {Root                      root                      "Root"                      }
+  {Machine                   machine                   "Machine"                   }
+  {Process                   process                   "Process"                   }
+  {Thread                    thread                    "Thread"                    }
+  {Module                    module                    "Module"                    }
+  {EntryPoint                entry_point               "Entry Point"               }
+  {DebugInfoPath             debug_info_path           "Debug Info Path"           }
+  {PendingThreadName         pending_thread_name       "Pending Thread Name"       }
+  {PendingThreadColor        pending_thread_color      "Pending Thread Color"      }
+  {Breakpoint                breakpoint                "Breakpoint"                }
+  {AddressRangeAnnotation    address_range_annotation  "Address Range Annotation"  }
+}
+
+@enum CTRL_EntityKind:
+{
+  Null,
+  @expand(CTRL_EntityKindTable a) `$(a.name)`,
+  COUNT,
+}
+
+@data(String8) ctrl_entity_kind_code_name_table:
+{
+  `{0}`,
+  @expand(CTRL_EntityKindTable a) `str8_lit_comp("$(a.code_name)")`
+}
+
+@data(String8) ctrl_entity_kind_display_string_table:
+{
+  `{0}`,
+  @expand(CTRL_EntityKindTable a) `str8_lit_comp("$(a.display_name)")`
+}
+
+////////////////////////////////
+//~ rjf: Exception Codes
 
 @table(name lower_name code default display_string)
 CTRL_ExceptionCodeKindTable:
@@ -45,9 +83,6 @@ CTRL_ExceptionCodeKindTable:
   {Win32SanitizerRawAccessViolation    win32_sanitizer_raw_access_violation        0xe0736171  0  "(Win32) Sanitizer Raw Access Violation"                         }
   {Win32DirectXDebugLayer              win32_directx_debug_layer                   0x0000087a  1  "(Win32) DirectX Debug Layer"                                    }
 }
-
-////////////////////////////////
-//~ rjf: Generators
 
 @enum CTRL_ExceptionCodeKind:
 {

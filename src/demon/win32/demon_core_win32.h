@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Epic Games Tools
+// Copyright (c) Epic Games Tools
 // Licensed under the MIT license (https://opensource.org/license/mit/)
 
 #ifndef DEMON_CORE_WIN32_H
@@ -15,45 +15,50 @@
 ////////////////////////////////
 //~ rjf: Win32 Exception Codes
 
-#define DMN_W32_EXCEPTION_BREAKPOINT               0x80000003u
-#define DMN_W32_EXCEPTION_SINGLE_STEP              0x80000004u
-#define DMN_W32_EXCEPTION_LONG_JUMP                0x80000026u
-#define DMN_W32_EXCEPTION_ACCESS_VIOLATION         0xC0000005u
-#define DMN_W32_EXCEPTION_ARRAY_BOUNDS_EXCEEDED    0xC000008Cu
-#define DMN_W32_EXCEPTION_DATA_TYPE_MISALIGNMENT   0x80000002u
-#define DMN_W32_EXCEPTION_GUARD_PAGE_VIOLATION     0x80000001u
-#define DMN_W32_EXCEPTION_FLT_DENORMAL_OPERAND     0xC000008Du
-#define DMN_W32_EXCEPTION_FLT_DEVIDE_BY_ZERO       0xC000008Eu
-#define DMN_W32_EXCEPTION_FLT_INEXACT_RESULT       0xC000008Fu
-#define DMN_W32_EXCEPTION_FLT_INVALID_OPERATION    0xC0000090u
-#define DMN_W32_EXCEPTION_FLT_OVERFLOW             0xC0000091u
-#define DMN_W32_EXCEPTION_FLT_STACK_CHECK          0xC0000092u
-#define DMN_W32_EXCEPTION_FLT_UNDERFLOW            0xC0000093u
-#define DMN_W32_EXCEPTION_INT_DIVIDE_BY_ZERO       0xC0000094u
-#define DMN_W32_EXCEPTION_INT_OVERFLOW             0xC0000095u
-#define DMN_W32_EXCEPTION_PRIVILEGED_INSTRUCTION   0xC0000096u
-#define DMN_W32_EXCEPTION_ILLEGAL_INSTRUCTION      0xC000001Du
-#define DMN_W32_EXCEPTION_IN_PAGE_ERROR            0xC0000006u
-#define DMN_W32_EXCEPTION_INVALID_DISPOSITION      0xC0000026u
-#define DMN_W32_EXCEPTION_NONCONTINUABLE           0xC0000025u
-#define DMN_W32_EXCEPTION_STACK_OVERFLOW           0xC00000FDu
-#define DMN_W32_EXCEPTION_INVALID_HANDLE           0xC0000008u
-#define DMN_W32_EXCEPTION_UNWIND_CONSOLIDATE       0x80000029u
-#define DMN_W32_EXCEPTION_DLL_NOT_FOUND            0xC0000135u
-#define DMN_W32_EXCEPTION_ORDINAL_NOT_FOUND        0xC0000138u
-#define DMN_W32_EXCEPTION_ENTRY_POINT_NOT_FOUND    0xC0000139u
-#define DMN_W32_EXCEPTION_DLL_INIT_FAILED          0xC0000142u
-#define DMN_W32_EXCEPTION_CONTROL_C_EXIT           0xC000013Au
-#define DMN_W32_EXCEPTION_FLT_MULTIPLE_FAULTS      0xC00002B4u
-#define DMN_W32_EXCEPTION_FLT_MULTIPLE_TRAPS       0xC00002B5u
-#define DMN_W32_EXCEPTION_NAT_CONSUMPTION          0xC00002C9u
-#define DMN_W32_EXCEPTION_HEAP_CORRUPTION          0xC0000374u
-#define DMN_W32_EXCEPTION_STACK_BUFFER_OVERRUN     0xC0000409u
-#define DMN_W32_EXCEPTION_INVALID_CRUNTIME_PARAM   0xC0000417u
-#define DMN_W32_EXCEPTION_ASSERT_FAILURE           0xC0000420u
-#define DMN_W32_EXCEPTION_NO_MEMORY                0xC0000017u
-#define DMN_W32_EXCEPTION_THROW                    0xE06D7363u
-#define DMN_W32_EXCEPTION_SET_THREAD_NAME          0x406d1388u
+#define DMN_W32_EXCEPTION_BREAKPOINT                     0x80000003u
+#define DMN_W32_EXCEPTION_SINGLE_STEP                    0x80000004u
+#define DMN_W32_EXCEPTION_LONG_JUMP                      0x80000026u
+#define DMN_W32_EXCEPTION_ACCESS_VIOLATION               0xC0000005u
+#define DMN_W32_EXCEPTION_ARRAY_BOUNDS_EXCEEDED          0xC000008Cu
+#define DMN_W32_EXCEPTION_DATA_TYPE_MISALIGNMENT         0x80000002u
+#define DMN_W32_EXCEPTION_GUARD_PAGE_VIOLATION           0x80000001u
+#define DMN_W32_EXCEPTION_FLT_DENORMAL_OPERAND           0xC000008Du
+#define DMN_W32_EXCEPTION_FLT_DEVIDE_BY_ZERO             0xC000008Eu
+#define DMN_W32_EXCEPTION_FLT_INEXACT_RESULT             0xC000008Fu
+#define DMN_W32_EXCEPTION_FLT_INVALID_OPERATION          0xC0000090u
+#define DMN_W32_EXCEPTION_FLT_OVERFLOW                   0xC0000091u
+#define DMN_W32_EXCEPTION_FLT_STACK_CHECK                0xC0000092u
+#define DMN_W32_EXCEPTION_FLT_UNDERFLOW                  0xC0000093u
+#define DMN_W32_EXCEPTION_INT_DIVIDE_BY_ZERO             0xC0000094u
+#define DMN_W32_EXCEPTION_INT_OVERFLOW                   0xC0000095u
+#define DMN_W32_EXCEPTION_PRIVILEGED_INSTRUCTION         0xC0000096u
+#define DMN_W32_EXCEPTION_ILLEGAL_INSTRUCTION            0xC000001Du
+#define DMN_W32_EXCEPTION_IN_PAGE_ERROR                  0xC0000006u
+#define DMN_W32_EXCEPTION_INVALID_DISPOSITION            0xC0000026u
+#define DMN_W32_EXCEPTION_NONCONTINUABLE                 0xC0000025u
+#define DMN_W32_EXCEPTION_STACK_OVERFLOW                 0xC00000FDu
+#define DMN_W32_EXCEPTION_INVALID_HANDLE                 0xC0000008u
+#define DMN_W32_EXCEPTION_UNWIND_CONSOLIDATE             0x80000029u
+#define DMN_W32_EXCEPTION_DLL_NOT_FOUND                  0xC0000135u
+#define DMN_W32_EXCEPTION_ORDINAL_NOT_FOUND              0xC0000138u
+#define DMN_W32_EXCEPTION_ENTRY_POINT_NOT_FOUND          0xC0000139u
+#define DMN_W32_EXCEPTION_DLL_INIT_FAILED                0xC0000142u
+#define DMN_W32_EXCEPTION_CONTROL_C_EXIT                 0xC000013Au
+#define DMN_W32_EXCEPTION_FLT_MULTIPLE_FAULTS            0xC00002B4u
+#define DMN_W32_EXCEPTION_FLT_MULTIPLE_TRAPS             0xC00002B5u
+#define DMN_W32_EXCEPTION_NAT_CONSUMPTION                0xC00002C9u
+#define DMN_W32_EXCEPTION_HEAP_CORRUPTION                0xC0000374u
+#define DMN_W32_EXCEPTION_STACK_BUFFER_OVERRUN           0xC0000409u
+#define DMN_W32_EXCEPTION_INVALID_CRUNTIME_PARAM         0xC0000417u
+#define DMN_W32_EXCEPTION_ASSERT_FAILURE                 0xC0000420u
+#define DMN_W32_EXCEPTION_NO_MEMORY                      0xC0000017u
+#define DMN_W32_EXCEPTION_THROW                          0xE06D7363u
+#define DMN_W32_EXCEPTION_SET_THREAD_NAME                0x406d1388u
+#define DMN_w32_EXCEPTION_CLRDBG_NOTIFICATION            0x04242420u
+#define DMN_w32_EXCEPTION_CLR                            0xE0434352u
+#define DMN_W32_EXCEPTION_RADDBG_SET_THREAD_COLOR        0x00524144u
+#define DMN_W32_EXCEPTION_RADDBG_SET_BREAKPOINT          0x00524145u
+#define DMN_W32_EXCEPTION_RADDBG_SET_VADDR_RANGE_NOTE    0x00524156u
 
 ////////////////////////////////
 //~ rjf: Win32 Register Codes
@@ -61,11 +66,11 @@
 #define DMN_W32_CTX_X86       0x00010000
 #define DMN_W32_CTX_X64       0x00100000
 
-#define DMN_W32_CTX_INTEL_CONTROL       0x0001
-#define DMN_W32_CTX_INTEL_INTEGER       0x0002
-#define DMN_W32_CTX_INTEL_SEGMENTS      0x0004
-#define DMN_W32_CTX_INTEL_FLOATS        0x0008
-#define DMN_W32_CTX_INTEL_DEBUG         0x0010
+#define DMN_W32_CTX_INTEL_CONTROL       0x0001    // segss, rsp, segcs, rip, and rflags
+#define DMN_W32_CTX_INTEL_INTEGER       0x0002    // rax, rcx, rdx, rbx, rbp, rsi, rdi, and r8-r15
+#define DMN_W32_CTX_INTEL_SEGMENTS      0x0004    // segds, seges, segfs, and seggs
+#define DMN_W32_CTX_INTEL_FLOATS        0x0008    // xmm0-xmm15
+#define DMN_W32_CTX_INTEL_DEBUG         0x0010    // dr0-dr3 and dr6-dr7
 #define DMN_W32_CTX_INTEL_EXTENDED      0x0020
 #define DMN_W32_CTX_INTEL_XSTATE        0x0040
 
@@ -104,7 +109,7 @@ struct DMN_W32_Entity
   U32 gen;
   U64 id;
   HANDLE handle;
-  Architecture arch;
+  Arch arch;
   union
   {
     struct
@@ -172,7 +177,7 @@ struct DMN_W32_InjectedBreak
 typedef struct DMN_W32_ImageInfo DMN_W32_ImageInfo;
 struct DMN_W32_ImageInfo
 {
-  Architecture arch;
+  Arch arch;
   U32 size;
 };
 
@@ -275,8 +280,8 @@ internal DMN_W32_ImageInfo dmn_w32_image_info_from_process_base_vaddr(HANDLE pro
 //- rjf: threads
 internal U16 dmn_w32_real_tag_word_from_xsave(XSAVE_FORMAT *fxsave);
 internal U16 dmn_w32_xsave_tag_word_from_real_tag_word(U16 ftw);
-internal B32 dmn_w32_thread_read_reg_block(Architecture arch, HANDLE thread, void *reg_block);
-internal B32 dmn_w32_thread_write_reg_block(Architecture arch, HANDLE thread, void *reg_block);
+internal B32 dmn_w32_thread_read_reg_block(Arch arch, HANDLE thread, void *reg_block);
+internal B32 dmn_w32_thread_write_reg_block(Arch arch, HANDLE thread, void *reg_block);
 
 //- rjf: remote thread injection
 internal DWORD dmn_w32_inject_thread(HANDLE process, U64 start_address);
