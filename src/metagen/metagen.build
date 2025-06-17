@@ -1,72 +1,82 @@
 Assembly %_filename
+Icon ../../data/logo.ico
+.run
 
 if cl Compiler cl else Compiler clang
 
-BuildDirectory ../../build
-IntermediateDirectory ../../int/%_filename
+BuildDirectory        ../../build
+IntermediateDirectory ../../int/$Assembly
 
-IncludedSourceFiles metagen_main.c
-
-Icon ../../data/logo.ico
-
-LinkerFlags_Clang -Xlinker /natvis:"..\src\natvis\base.natvis"
-LinkerFlags_MSVC  /natvis:"..\src\natvis\base.natvis"
-
-WarningFlags_Clang [
-    -Wall
-    -Wno-missing-braces
-    -Wno-unused-function
-    -Wno-writable-strings
-    -Wno-unused-value
-    -Wno-unused-variable
-    -Wno-unused-local-typedef
-    -Wno-deprecated-register
-    -Wno-deprecated-declarations
-    -Wno-unused-but-set-variable
-    -Wno-single-bit-bitfield-constant-conversion
-]
-
-CommonFlags_Clang [
-    $WarningFlags_Clang
-    -maes
-    -mssse3
-    -msse4
-    -gcodeview
-    -fdiagnostics-absolute-paths
-    -Xclang
-    -flto-visibility-public-std
-]
-
-CommonFlags_MSVC /FC /Z7 /MP
-
-CommonDefines_Clang [
-    _USE_MATH_DEFINES
-    strdup=_strdup
-    gnu_printf=printf
-]
-
-DebugFlags_Clang [
-    $CommonFlags_Clang
-    -g
-    -O0
-]
-
-DebugFlags_MSVC [
-    $CommonFlags_MSVC
-    /Od
-]
-
-Defines _DEBUG
-
-if compiler == clang {
-    CompilerFlags    $DebugFlags_Clang
-    LinkerFlags      $LinkerFlags_Clang
-    Defines          $CommonDefines_Clang
-} else {
-    CompilerFlags    $DebugFlags_MSVC
-    LinkerFlags      $LinkerFlags_MSVC
-}
+SourceFiles metagen_main.c
 
 Includes ../../src ../../local
 
-RunAssembly
+NatvisFlag /natvis:"..\src\natvis\base.natvis"
+
+if compiler == clang
+{
+    WarningFlags
+    [
+        -Wall
+        -Wno-missing-braces
+        -Wno-unused-function
+        -Wno-writable-strings
+        -Wno-unused-value
+        -Wno-unused-variable
+        -Wno-unused-local-typedef
+        -Wno-deprecated-register
+        -Wno-deprecated-declarations
+        -Wno-unused-but-set-variable
+        -Wno-single-bit-bitfield-constant-conversion
+        -Wno-compare-distinct-pointer-types
+        -Wno-unknown-warning-option
+        -Wno-unused-parameter
+        -Wno-missing-field-initializers
+        -Wno-initializer-overrides
+        -Wno-incompatible-pointer-types-discards-qualifiers
+    ]
+
+    Compiler.Flags
+    [
+        $WarningFlags
+        -maes
+        -mssse3
+        -msse4
+        -gcodeview
+        -fdiagnostics-absolute-paths
+        -Xclang
+        -flto-visibility-public-std
+    ]
+
+    Defines
+    [
+        _USE_MATH_DEFINES
+        strdup=_strdup
+        gnu_printf=printf
+    ]
+
+    DebugFlags      -g -O0
+    ReleaseFlags    -g -O3
+    
+    Linker.Flags    -Xlinker $NatvisFlag
+}
+else
+{
+    Compiler.Flags  /FC /Z7 /MP
+
+    DebugFlags      /Od
+    ReleaseFlags    /O2
+
+    Linker.Flags    $NatvisFlag
+}
+
+if release
+{
+    Compiler.Flags $ReleaseFlags
+    Defines        NDEBUG
+}
+else
+{
+    Compiler.Flags $DebugFlags
+    Defines        _DEBUG
+}

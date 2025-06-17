@@ -1,5 +1,6 @@
 # --- Usage Notes (2024/1/10) ------------------------------------------------
-.Help {
+.Help
+{
   This is a central build script for the RAD Debugger project. It takes a list
   of simple alphanumeric-only arguments which control 
      (a) what is built
@@ -17,129 +18,182 @@
   Below is a list of all possible non-target command line options:
   - asan      : enable address sanitizer
   - telemetry : enable RAD telemetry profiling support
+  - spall     : enable spall profiling support
+
+  To see a list of all options, run:
+  - riftbuild options
 }
 # ---------------------------------------------------------------------------
 
-FinalName raddbg
-
 if release Assembly $(FinalName) else Assembly $(FinalName)-debug
-if cl      Compiler cl     else Compiler clang
-
-if !no_meta Depends metagen src/metagen | $compiler
-
-SourceDirectory       src
-BuildDirectory        build
-IntermediateDirectory int
-
-FilesToUse raddbg_main.c
-
-if rdi_from_pdb              FinalName` rdi_from_pdb          ; FilesToUse` rdi_from_pdb_main.c
-if rdi_from_dwarf            FinalName` rdi_from_dwarf        ; FilesToUse` rdi_from_dwarf.c
-if rdi_dump                  FinalName` rdi_dump              ; FilesToUse` rdi_dump_main.c
-if rdi_breakpad_from_pdb     FinalName` rdi_breakpad_from_pdb ; FilesToUse` rdi_breakpad_from_pdb_main.c
-if ryan_scratch              FinalName` ryan_scratch          ; FilesToUse` ryan_scratch.c
-if cpp_tests                 FinalName` cpp_tests             ; FilesToUse` i_hate_c_plus_plus.cpp
-if look_at_raddgb            FinalName` look_at_raddgb        ; FilesToUse` look_at_raddbg.c
-if mule_main                 FinalName` mule_main             ; FilesToUse` mule_main.cpp mule_inline.cpp
-if mule_module               FinalName` mule_module           ; FilesToUse` mule_module.cpp
-
-IncludedSourceFiles $FilesToUse
-
-Includes src local
-
-Defines [
-    OS_FEATURE_GRAPHICAL=%!rdi_from_pdb
-    OS_FEATURE_SOCKET=%net
-    BUILD_GIT_HASH=\"!(git describe --always --dirty)\"
-]
+if cl      Compiler cl           else Compiler clang
 
 Icon logo.ico
 
-#PreBuild.NewDirectory local
+if !no_meta Depends metagen src/metagen | $compiler
 
-AsanCompilerFlags
-TelemetryDefines
-if asan      AsanCompilerFlags -fsanitize=address
-if telemetry TelemetryDefines PROFILE_TELEMETRY=1
+BuildDirectory        build
+IntermediateDirectory int
+
+if radlink                 FinalName radlink               ; FilesToUse src/linker/lnk.c
+if radbin                  FinalName radbin                ; FilesToUse src/radbin/radbin_main.c
+if raddump                 FinalName raddump               ; FilesToUse src/raddump/raddump_main.c
+if tester                  FinalName tester                ; FilesToUse src/tester/tester_main.c
+if rdi_from_pdb            FinalName rdi_from_pdb          ; FilesToUse src/rdi_from_pdb/rdi_from_pdb_main.c
+if rdi_from_dwarf          FinalName rdi_from_dwarf        ; FilesToUse src/rdi_from_dwarf/rdi_from_dwarf.c
+if rdi_dump                FinalName rdi_dump              ; FilesToUse src/rdi_dump/rdi_dump_main.c
+if rdi_breakpad_from_pdb   FinalName rdi_breakpad_from_pdb ; FilesToUse src/rdi_breakpad_from_pdb/rdi_breakpad_from_pdb_main.c
+if ryan_scratch            FinalName ryan_scratch          ; FilesToUse src/scratch/ryan_scratch.c
+if cpp_tests               FinalName cpp_tests             ; FilesToUse src/scratch/i_hate_c_plus_plus.cpp
+if look_at_raddbg          FinalName look_at_raddbg        ; FilesToUse src/scratch/look_at_raddbg.c
+if mule_main               FinalName mule_main             ; FilesToUse src/mule/mule_main.cpp mule_inline.cpp
+if mule_module             FinalName mule_module           ; FilesToUse src/mule/mule_module.cpp
+
+if !FinalName
+{
+    "[default mode, assuming `raddbg` build]"
+    
+    FinalName  raddbg
+    FilesToUse src/raddbg/raddbg_main.c
+    
+    # uncomment to auto run after a build. alternatively, specify 'run' on the cmd line
+    #.run
+}
+
+if radlink NatvisFile src\linker\linker.natvis
+
+if !NatvisFile
+{
+    NatvisFile src\natvis\base.natvis
+}
+
+SourceFiles $FilesToUse
+
+Includes src local
+
+Defines
+[
+    BUILD_GIT_HASH="!(git describe --always --dirty)"
+    BUILD_GIT_HASH_FULL="!(git rev-parse HEAD)"
+    PROFILE_TELEMETRY=%telemetry
+    PROFILE_SPALL=%spall
+    BUILD_DEBUG=%!release
+]
 
 # status logging
-if FilesToUse == raddbg_main.c "[default mode, assuming `raddbg` build]"
-if FilesToUse == raddbg_main.c RunAssembly
+if !release                "[debug mode]"
+if release                 "[release mode]"
+if compiler == clang       "[clang compile]"
+if compiler == cl          "[msvc compile]"
+if asan                    "[address sanitizer enabled]"
+if telemetry               "[telemetry profiling enabled]"
+if no_meta                 "[skipping metagen]"
+if spall                   "[spall profiling enabled]"
+if opengl                  "[opengl render backend]"
 
-if debug                       "[debug mode]"
-if release                     "[release mode]"
-if compiler == clang           "[clang compile]"
-if compiler == cl              "[msvc compile]"
-if asan                        "[asan enabled]"
-if telemetry                   "[telemetry enabled]"
-if no_meta                     "[skipping metagen]"
+NatvisFlag /natvis:"$NatvisFile"
 
-WarningFlags_Clang [
-    -Wall
-    -Wno-missing-braces
-    -Wno-unused-function
-    -Wno-writable-strings
-    -Wno-unused-value
-    -Wno-unused-variable
-    -Wno-unused-local-typedef
-    -Wno-deprecated-register
-    -Wno-deprecated-declarations
-    -Wno-unused-but-set-variable
-    -Wno-single-bit-bitfield-constant-conversion
-    -Wno-compare-distinct-pointer-types
-]
+if compiler == clang
+{
+    WarningFlags
+    [
+        -Wall
+        -Wno-missing-braces
+        -Wno-unused-function
+        -Wno-writable-strings
+        -Wno-unused-value
+        -Wno-unused-variable
+        -Wno-unused-local-typedef
+        -Wno-deprecated-register
+        -Wno-deprecated-declarations
+        -Wno-unused-but-set-variable
+        -Wno-single-bit-bitfield-constant-conversion
+        -Wno-compare-distinct-pointer-types
+        -Wno-unknown-warning-option
+        -Wno-unused-parameter
+        -Wno-missing-field-initializers
+        -Wno-initializer-overrides
+        -Wno-incompatible-pointer-types-discards-qualifiers
+    ]
 
-CommonFlags_Clang [
-    $WarningFlags_Clang
-    -maes -msse3 -msse4
-    -gcodeview
-    -fdiagnostics-absolute-paths
-    -Xclang
-    -flto-visibility-public-std
-]
+    Compiler.Flags
+    [
+        $WarningFlags
+        -maes -msse3 -msse4
+        -gcodeview
+        -ferror-limit=10000
+        -fdiagnostics-absolute-paths
+        -Xclang
+        -flto-visibility-public-std
+    ]
 
-CommonDefines_Clang [
-    _USE_MATH_DEFINES
-    strdup=_strdup
-    gnu_printf=printf
-    $TelemetryDefines
-]
+    if asan Compiler.Flags -fsanitize=address
 
-CommonFlags_MSVC   /nologo /FC /Z7 /MP
-CommonDefines_MSVC $TelemetryDefines
+    Defines
+    [
+        _USE_MATH_DEFINES
+        strdup=_strdup
+        gnu_printf=printf
+    ]
 
-DebugFlags_Clang   $CommonFlags_Clang -g -O0
-ReleaseFlags_Clang $CommonFlags_Clang -g -O3
+    DebugFlags    -g -O0
+    ReleaseFlags  -g -O3
 
-DebugFlags_MSVC    $CommonFlags_MSVC /Od
-ReleaseFlags_MSVC  $CommonFlags_MSVC /O2
+    Linker.Flags  -Wl,/DYNAMICBASE:NO -Xlinker $NatvisFlag
+}
+else
+{
+    Compiler.Flags /FC /Z7 /MP
+    
+    DebugFlags     /Od
+    ReleaseFlags   /O2
 
-DebugDefines       _DEBUG
-ReleaseDefines     NDEBUG
+    Linker.Flags  $NatvisFlag /MANIFEST:EMBED /INCREMENTAL:NO /DYNAMICBASE:NO /noexp
+    Linker.Flags:radlink /NOIMPLIB
+} 
 
-if compiler == clang {
-    ReleaseFlags     $ReleaseFlags_Clang
-    DebugFlags       $DebugFlags_Clang
-    LinkerFlags      -Xlinker /natvis:"src\natvis\base.natvis"
-    Defines          $CommonDefines_Clang
-} else {
-    ReleaseFlags     $ReleaseFlags_MSVC
-    DebugFlags       $DebugFlags_MSVC
-    LinkerFlags      /natvis:"src\natvis\base.natvis"
-    Defines          $CommonDefines_MSVC
+if release
+{
+    Compiler.Flags $ReleaseFlags
+    Defines        NDEBUG
+}
+else
+{
+    Compiler.Flags $DebugFlags
+    Defines        _DEBUG
 }
 
-if release {
-    CompilerFlags $ReleaseFlags
-    Defines       $ReleaseDefines
-} else {
-    CompilerFlags $DebugFlags
-    Defines       $DebugDefines
-}
 
-AssertArchitecture x64
-AssertPlatform     Windows
-Architecture.x86.ErrorMessage {
+# -- Asserts ----------------------------------------------
+
+Assert.Architecture x64
+Assert.Platform     Windows
+
+Architecture.x86.ErrorMessage
+{
     You tried to build in x86 (%_bit bit) mode, but currently,
     only building in x64 (64 bit) mode is supported.
 }
+
+
+# -- Options List ----------------------------------------------
+option.release.description                Build in Release configuration. Default is Debug.
+option.opengl.description                 Use the OpenGL render backend
+option.no_meta.description                Skip the metagen build
+
+option.asan.description                   Enable the address sanitizer for memory verification purposes
+option.telemetry.description              Enable RAD telemetry profiling support
+option.spall.description                  Enable spall profiling support
+
+option.radlink.description                Build the rad linker
+option.radbin.description                 Build the rad bin tool
+option.raddump.description                Build the rad dump tool
+option.tester.description                 Build the tester executable
+option.rdi_from_pdb.description           Build the rdi_from_pdb tool
+option.rdi_from_dwarf.description         Build the rdi_from_dwarf tool
+option.rdi_dump.description               Build the rdi_dump tool
+option.rdi_breakpad_from_pdb.description  Build the rdi_breakpad_from_pdb tool
+option.ryan_scratch
+option.cpp_tests.description              You have no idea how much i hate c++
+option.loot_at_raddbg
+option.mule_main
